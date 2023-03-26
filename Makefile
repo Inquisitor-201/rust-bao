@@ -6,6 +6,9 @@ bao_elf:=$(target_dir)/rust-bao
 bao_bin:=$(target_dir)/rust-bao.bin
 bao_disasm:=$(target_dir)/rust-bao.asm
 
+imgs_dir:=imgs
+atf-fip:=$(imgs_dir)/flash.bin
+
 OBJCOPY := rust-objcopy --binary-architecture=aarch64
 
 qemu_cmd:=/home/clk/workspace/bao-demos/wrkdir/srcs/qemu/build/qemu-system-aarch64
