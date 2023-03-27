@@ -21,7 +21,8 @@ qemu_flags:=-nographic\
 		-netdev user,id=net0,net=192.168.42.0/24,hostfwd=tcp:127.0.0.1:5555-:22\
 		-device virtio-serial-device -chardev pty,id=serial3 -device virtconsole,chardev=serial3
 
-build: $(bao_elf)
+build: env
+	cargo build --release
 
 disasm:
 	$(toolchain_prefix)-objdump -lS $(bao_elf) > $(bao_disasm)
@@ -29,7 +30,7 @@ disasm:
 run: $(bao_bin)
 	@$(qemu_cmd) $(qemu_flags)
 	
-gdb:
+gdb: $(bao_bin)
 	@$(qemu_cmd) $(qemu_flags) -s -S
 
 monitor:
@@ -39,10 +40,10 @@ env:
 	rustup target add $(rustup_target)
 	rustup component add llvm-tools-preview
 
-$(bao_elf): env
-	cargo build --release
+clean:
+	cargo clean
 
-$(bao_bin): $(bao_elf)
-	@$(OBJCOPY) $^ --strip-all -O binary $@
+$(bao_bin): build
+	@$(OBJCOPY) $(bao_elf) --strip-all -O binary $@
 
-.PHONY: env build run gdb monitor
+.PHONY: env build run gdb monitor clean disasm
