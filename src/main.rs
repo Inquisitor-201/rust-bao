@@ -1,12 +1,14 @@
 #![no_std]
 #![no_main]
+#![feature(asm_const)]
 
-use core::arch::global_asm;
+pub mod arch;
+pub mod baocore;
+pub mod platform;
+
 use core::panic::PanicInfo;
 
-global_asm!(include_str!("arch/aarch64/boot.S"));
-
 #[panic_handler]
-fn panic(info: &PanicInfo) -> ! {
+fn panic(_info: &PanicInfo) -> ! {
     loop {}
 }
