@@ -1,5 +1,3 @@
 #[repr(C)]
 #[derive(Default)]
-pub struct Cache {
-
-}
+pub struct Cache {}

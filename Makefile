@@ -5,6 +5,7 @@ target_dir:=target/$(rustup_target)/release
 bao_elf:=$(target_dir)/rust-bao
 bao_bin:=$(target_dir)/rust-bao.bin
 bao_disasm:=$(target_dir)/rust-bao.asm
+bao_elf_txt:=$(target_dir)/rust-bao.elf.txt
 
 imgs_dir:=imgs
 atf-fip:=$(imgs_dir)/flash.bin
@@ -24,8 +25,9 @@ qemu_flags:=-nographic\
 build: env
 	cargo build --release
 
-disasm:
+dump:
 	$(toolchain_prefix)-objdump -lS $(bao_elf) > $(bao_disasm)
+	$(toolchain_prefix)-readelf -a $(bao_elf) > $(bao_elf_txt)
 
 run: $(bao_bin)
 	@$(qemu_cmd) $(qemu_flags)
@@ -46,4 +48,4 @@ clean:
 $(bao_bin): build
 	@$(OBJCOPY) $(bao_elf) --strip-all -O binary $@
 
-.PHONY: env build run gdb monitor clean disasm
+.PHONY: env build run gdb monitor clean dump

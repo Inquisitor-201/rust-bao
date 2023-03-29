@@ -2,7 +2,7 @@ OUTPUT_ARCH(aarch64)
 ENTRY(_el2_entry)
 
 PAGE_SIZE = 0x1000;
-BASE_ADDRESS = 0x50000000;
+BASE_ADDRESS = 0xfd8000000000;
 
 SECTIONS
 {
@@ -29,4 +29,49 @@ SECTIONS
         PROVIDE(__global_pointer$ = . + 0x800);
 		*(.sdata .sdata.* .sdata2.*)
 	}
+
+	.ipi_cpumsg_handlers : {
+		ipi_cpumsg_handlers = .;
+		*(.ipi_cpumsg_handlers)
+	}
+
+	.ipi_cpumsg_handlers_id : {
+		_ipi_cpumsg_handlers_id_start = .;
+		*(.ipi_cpumsg_handlers_id)
+	}
+
+	_ipi_cpumsg_handlers_size = SIZEOF(.ipi_cpumsg_handlers);
+
+    . = ALIGN(PAGE_SIZE);
+    _image_load_end = .;
+
+	/* Sections to be allocated only in physical memory, not in VA space */
+
+	.vm_images : SUBALIGN(PAGE_SIZE) {
+		_vm_image_start = .;
+		KEEP(*(.vm_image*))
+	}
+	. = ALIGN(PAGE_SIZE);
+	_vm_image_end = .;
+    _image_noload_start = .;
+    extra_allocated_phys_mem = _image_noload_start - _image_load_end;
+
+	/* Only no load regions below */
+
+	.bss (NOLOAD) : {
+		_bss_start = .;
+		*(.bss* .sbss*)
+		*(COMMON)
+		_bss_end = .;
+	}
+
+	.glb_page_tables (NOLOAD) : ALIGN(PAGE_SIZE) {
+		_page_tables_start = .;
+		*(.glb_page_tables)
+		_page_tables_end = .;
+	}
+
+	. = ALIGN(PAGE_SIZE);
+	_image_end = ABSOLUTE(.);
+
 }

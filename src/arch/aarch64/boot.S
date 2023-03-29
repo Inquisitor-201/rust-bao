@@ -1,5 +1,3 @@
-.extern PLATFORM_OFFSET
-
 .section ".boot.entry", "ax"
 .global _el2_entry
 
@@ -92,7 +90,7 @@ _set_master_cpu:
 
 	ic iallu
 
-	# bl boot_arch_profile_init
+	bl boot_arch_profile_init
 
 /*
  * Code taken from "Application Note Bare-metal Boot Code for ARMv8-A
@@ -126,4 +124,18 @@ set_loop:
 	add x5, x5, #1 // else, next way.
 	cmp x5, x3 // last way reached yet?
 	ble way_loop // if not, iterate way_loop
+	ret
+
+/***** 	Helper functions for boot code. ******/
+
+/* boot_clear: Clear the memory in the range [x16, x17). */
+
+.global boot_clear
+boot_clear:
+2:
+	cmp	x16, x17			
+	b.ge 1f				
+	str	xzr, [x16], #8	
+	b	2b				
+1:
 	ret

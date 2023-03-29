@@ -1,7 +1,8 @@
 use core::arch::global_asm;
 
-pub mod bao_defs;
-use bao_defs::*;
+pub mod armv8_a;
+pub mod defs;
+use defs::*;
 
 global_asm!(include_str!("boot.S"),
     platform = sym crate::platform::PLATFORM,

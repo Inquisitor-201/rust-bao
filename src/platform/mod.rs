@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 pub mod qemu_aarch64_virt;
 
 use crate::baocore::cache::Cache;
@@ -71,6 +73,7 @@ pub struct Platform {
 const PLAT_ARCH_OFF: usize = size_of::<Platform>() - size_of::<ArchPlatform>();
 const PLAT_ARCH_CLUSTERS_OFF: usize = size_of::<ArchPlatform>() - size_of::<ClustersDescriptor>();
 const PLAT_CLUSTERS_CORES_NUM_OFF: usize = size_of::<usize>();
-pub const PLATFORM_OFFSET: usize = PLAT_ARCH_OFF + PLAT_ARCH_CLUSTERS_OFF + PLAT_CLUSTERS_CORES_NUM_OFF;
+pub const PLATFORM_OFFSET: usize =
+    PLAT_ARCH_OFF + PLAT_ARCH_CLUSTERS_OFF + PLAT_CLUSTERS_CORES_NUM_OFF;
 
 pub use qemu_aarch64_virt::PLATFORM;
