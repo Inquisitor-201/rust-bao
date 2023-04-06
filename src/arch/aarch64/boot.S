@@ -23,15 +23,12 @@ _el2_entry:
 	and x3, x3, 0xff
 	adr x4, {platform}
 	add x4, x4, {cores_num_off}
-	ldr x5, ={BAO_VAS_BASE}
-	sub x4, x4, x5
-	add x4, x4, x1
 	mov x5, xzr
 	mov x7, xzr
 1:
 	cmp x5, x3
 	b.ge	2f
-	ldrb w6, [x4]
+	ldrb x6, [x4]
 	add x4, x4, #1
 	add x5, x5, #1
 	add x7, x7, x6

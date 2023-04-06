@@ -23,7 +23,7 @@ qemu_flags:=-nographic\
 		-device virtio-serial-device -chardev pty,id=serial3 -device virtconsole,chardev=serial3
 
 build: env
-	cargo build --release
+	cargo build --release && make dump
 
 dump:
 	$(toolchain_prefix)-objdump -lS $(bao_elf) > $(bao_disasm)

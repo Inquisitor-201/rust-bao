@@ -50,7 +50,7 @@ const fn default_generic_timer_desc() -> GenericTimerDescriptor {
 #[repr(C)]
 struct ClustersDescriptor {
     num: usize,
-    core_nums: [usize; 4],
+    core_nums: [u8; 4],
 }
 
 const fn default_clusters_desc() -> ClustersDescriptor {

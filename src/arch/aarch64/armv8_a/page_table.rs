@@ -21,6 +21,7 @@ pub const PTE_AP_RW: u64 = 0x1u64 << PTE_AP_OFF;
 pub const PTE_SH_OFF: u64 = 8;
 pub const PTE_SH_IS: u64 = 0x3u64 << PTE_SH_OFF;
 pub const PTE_AF: u64 = 1u64 << 10;
+pub const PTE_PAGE: u64 = 3;
 
 pub const PTE_INVALID: u64 = 0;
 pub const PTE_SUPERPAGE: u64 = 0x1;

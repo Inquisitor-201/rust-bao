@@ -6,7 +6,6 @@ use defs::*;
 
 global_asm!(include_str!("boot.S"),
     platform = sym crate::platform::PLATFORM,
-    cores_num_off = const crate::platform::PLATFORM_OFFSET,
-    BAO_VAS_BASE = const BAO_VAS_BASE);
+    cores_num_off = const crate::platform::PLATFORM_OFFSET);
 
 global_asm!(include_str!("exceptions.S"));

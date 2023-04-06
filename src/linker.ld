@@ -56,6 +56,13 @@ SECTIONS
     _image_noload_start = .;
     extra_allocated_phys_mem = _image_noload_start - _image_load_end;
 
+	/**
+	 * Rewind LC to reuse VMA addresses occupied by config and make VA
+	 * start immediately after image.
+	 * Also, force start address of next section to enforce this.
+	 */
+    . = _image_load_end;
+
 	/* Only no load regions below */
 
 	.bss (NOLOAD) : {
@@ -73,5 +80,9 @@ SECTIONS
 
 	. = ALIGN(PAGE_SIZE);
 	_image_end = ABSOLUTE(.);
+	_dmem_phys_beg = ABSOLUTE(.) + extra_allocated_phys_mem;
+
+	. = ALIGN(PAGE_SIZE);
+	_dmem_beg = ABSOLUTE(.);
 
 }
