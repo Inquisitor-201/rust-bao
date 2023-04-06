@@ -28,7 +28,7 @@ _el2_entry:
 1:
 	cmp x5, x3
 	b.ge	2f
-	ldrb x6, [x4]
+	ldrb w6, [x4]
 	add x4, x4, #1
 	add x5, x5, #1
 	add x7, x7, x6
@@ -88,6 +88,40 @@ _set_master_cpu:
 	ic iallu
 
 	bl boot_arch_profile_init
+
+	mov x3, xzr
+	msr CPTR_EL2, x3
+
+	/* set up cpu stack */
+	mov x3, #1							
+	msr SPSEL, x3
+	mrs x3, tpidr_el2
+    ldr x4, =({CPU_STACK_OFF} + {CPU_STACK_SIZE})
+    add x3, x3, x4
+	mov SP, x3
+
+	/* If this is bsp (cpu 0) boot_clear bss */
+	cbnz x9, 1f
+	ldr	x16, =_bss_start	
+	ldr	x17, =_bss_end	
+	bl	boot_clear	
+
+	adr x5, _boot_barrier
+	mov x4, #2
+	str x4, [x5]	
+
+1:
+	/* wait for bsp to finish boot_clearing bss */
+	ldr x4, _boot_barrier
+	cmp x4, #2
+	b.lt 1b
+
+	isb
+
+	b init
+
+	/* This point should never be reached */
+	b	.
 
 /*
  * Code taken from "Application Note Bare-metal Boot Code for ARMv8-A

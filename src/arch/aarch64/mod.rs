@@ -2,7 +2,7 @@ use core::arch::global_asm;
 
 pub mod armv8_a;
 pub mod defs;
-use defs::*;
+pub mod sysregs;
 
 global_asm!(include_str!("boot.S"),
     platform = sym crate::platform::PLATFORM,

@@ -4,6 +4,15 @@
 	lsl \index, \index, #3
 .endm
 
+.data 
+.align 3
+/**
+ * barrier is used to minimal synchronization in boot - other cores wait for
+ * bsp to set it.
+ */
+ .global _boot_barrier
+_boot_barrier: .8byte 0		
+
 .section ".boot", "ax"
 .global boot_arch_profile_init
 boot_arch_profile_init:
@@ -112,5 +121,124 @@ map_cpu:
 	 */
 
 	adrp x3, _dmem_phys_beg
-	mov 
-_boot_barrier:
+	mov x8, #({CPU_SIZE} + ({PT_SIZE}*{PT_LVLS}))
+	madd x3, x0, x8, x3
+
+	mov	x16, x3	
+	add	x17, x3, x8
+	bl	boot_clear
+
+	/* Get pointer to root page table */
+	add x4, x3, #{CPU_SIZE}
+
+	/* map original bootstrap flat mappings */
+	PTE_INDEX_ASM x5, x1, 0 
+	adr x6, root_l1_flat_pt
+	add x6, x6, x18
+	add x6, x6, #({PTE_HYP_FLAGS} | {PTE_TABLE})
+	str x6, [x4, x5]
+	
+	ldr x5, =(({BAO_VAS_BASE} >> (9 * (3 - 0) + 12)) & 0x1FF)*8
+	adr x6, root_l1_pt
+	add x6, x6, x18
+	add x6, x6, #({PTE_HYP_FLAGS} | {PTE_TABLE})
+	str x6, [x4, x5]
+
+	ldr x5, =(({BAO_CPU_BASE} >> (9 * (3 - 0) + 12)) & 0x1FF)*8
+	add x6, x4, #{PT_SIZE}
+	add x6, x6, #({PTE_HYP_FLAGS} | {PTE_TABLE})
+	str x6, [x4, x5]
+
+	add x4, x4, #{PT_SIZE}
+	ldr x5, =(({BAO_CPU_BASE} >> (9 * (3 - 1) + 12)) & 0x1FF)*8
+	add x6, x4, #{PT_SIZE}
+	add x6, x6, #({PTE_HYP_FLAGS} | {PTE_TABLE})
+	str x6, [x4, x5]
+
+	add x4, x4, #{PT_SIZE}
+	ldr x5, =(({BAO_CPU_BASE} >> (9 * (3 - 2) + 12)) & 0x1FF)*8
+	add x6, x4, #{PT_SIZE}
+	add x6, x6, #({PTE_HYP_FLAGS} | {PTE_TABLE})
+	str x6, [x4, x5]
+
+	add x4, x4, #{PT_SIZE}
+	ldr x7, ={BAO_CPU_BASE}
+	add x8, x7, #({CPU_SIZE}+{PT_SIZE})
+	mov x6, x3
+	add x6, x6, #({PTE_HYP_FLAGS} | {PTE_TABLE})
+1:
+	cmp	x7, x8
+	b.ge setup_cpu
+	PTE_INDEX_ASM x5, x7, 3
+	str x6, [x4, x5]
+	add x6, x6, #{PAGE_SIZE}
+	add x7, x7, #{PAGE_SIZE}
+	b	1b
+
+setup_cpu:
+
+	/**
+	 * 	The operation is purposely commented out.
+	 *  We are assuming monitor code already enabled smp coherency.
+	 */ 
+	ldr x3, ={TCR_EL2_DFLT}
+	msr	TCR_EL2, x3
+
+	/* set hypervisor default memory attributes */
+	ldr x3, ={MAIR_EL2_DFLT}
+	msr	MAIR_EL2, x3
+
+    /* set cpu thread pointer */
+    ldr x3, ={BAO_CPU_BASE}
+    msr tpidr_el2, x3
+
+    adrp x3, _dmem_phys_beg
+	mov x8, #({CPU_SIZE} + ({PT_SIZE}*{PT_LVLS}))
+	madd x3, x0, x8, x3
+	add x3, x3, #{CPU_SIZE}
+.arch armv8-a
+	msr TTBR0_EL2, x3
+
+	/**	
+	 * TODO: set implementation defined registers such as ACTLR or AMAIR.
+	 * Maybe define a macro for this in a implementation oriented directory
+	 * inside arch.
+	 */
+
+	/**
+	 * TODO: invalidate caches, TLBs and branch prediction.
+	 * Need for barriers?
+	 */
+
+	ldr x5, =_enter_vas
+
+	/* Enable MMU and caches */
+	ldr x4, ={SCTLR_DFLT}
+	msr	SCTLR_EL2, x4
+	
+	tlbi	alle2
+	dsb	nsh
+	isb
+	
+	br  x5
+
+_enter_vas:
+
+	/* Install vector table virtual address*/
+	ldr x3, =_hyp_vector_table
+	msr VBAR_EL2, x3
+
+	/* Remove temporary mapping - the L1 page holding it leaks */
+	ldr x4, ={BAO_CPU_BASE}
+	add x4, x4, #{CPU_SIZE}
+	PTE_INDEX_ASM x5, x1, 0 
+	str xzr, [x4, x5]
+
+    tlbi	alle2
+	dsb	nsh
+	isb
+
+    sub x20, x20, x1
+    ldr x3, =_image_start
+    add x30, x20, x3
+    ret
