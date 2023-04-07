@@ -96,7 +96,7 @@ _set_master_cpu:
 	mov x3, #1							
 	msr SPSEL, x3
 	mrs x3, tpidr_el2
-    ldr x4, =({CPU_STACK_OFF} + {CPU_STACK_SIZE})
+    ldr x4, ={CPU_SIZE}
     add x3, x3, x4
 	mov SP, x3
 
