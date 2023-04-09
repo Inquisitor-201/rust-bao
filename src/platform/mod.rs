@@ -2,32 +2,32 @@
 
 pub mod qemu_aarch64_virt;
 
-use crate::baocore::cache::Cache;
+use crate::baocore::{cache::Cache, types::{Paddr, CpuID}};
 use core::mem::size_of;
 
 #[repr(C)]
-struct ArchPlatform {
-    gic: GICDescriptor,
-    smmu: SMMUDescriptor,
-    generic_timer: GenericTimerDescriptor,
-    clusters: ClustersDescriptor,
+pub struct ArchPlatform {
+    pub gic: GICDescriptor,
+    pub smmu: SMMUDescriptor,
+    pub generic_timer: GenericTimerDescriptor,
+    pub clusters: ClustersDescriptor,
 }
 
 #[repr(C)]
-struct GICDescriptor {
-    gicc_addr: u64,
-    gich_addr: u64,
-    gicv_addr: u64,
-    gicd_addr: u64,
-    gicr_addr: u64,
-    maintenance_id: u32,
+pub struct GICDescriptor {
+    pub gicc_addr: u64,
+    pub gich_addr: u64,
+    pub gicv_addr: u64,
+    pub gicd_addr: u64,
+    pub gicr_addr: u64,
+    pub maintenance_id: u32,
 }
 
 #[repr(C)]
-struct SMMUDescriptor {
-    base: u64,
-    interrupt_id: u32,
-    global_mask: usize,
+pub struct SMMUDescriptor {
+    pub base: u64,
+    pub interrupt_id: u32,
+    pub global_mask: usize,
 }
 
 const fn default_smmu_desc() -> SMMUDescriptor {
@@ -39,7 +39,7 @@ const fn default_smmu_desc() -> SMMUDescriptor {
 }
 
 #[repr(C)]
-struct GenericTimerDescriptor {
+pub struct GenericTimerDescriptor {
     base_addr: u64,
 }
 
@@ -48,9 +48,9 @@ const fn default_generic_timer_desc() -> GenericTimerDescriptor {
 }
 
 #[repr(C)]
-struct ClustersDescriptor {
-    num: usize,
-    core_nums: [u8; 4],
+pub struct ClustersDescriptor {
+    pub num: usize,
+    pub core_nums: [u8; 4],
 }
 
 const fn default_clusters_desc() -> ClustersDescriptor {
@@ -62,12 +62,16 @@ const fn default_clusters_desc() -> ClustersDescriptor {
 
 #[repr(C)]
 pub struct Platform {
-    cpu_num: usize,
-    region_num: usize,
+    pub cpu_num: usize,
+    pub region_num: usize,
     // struct mem_region *regions;
-    console: usize,
-    cache: Cache,
-    arch: ArchPlatform,
+    pub console_base: Paddr,
+    pub cache: Cache,
+    pub arch: ArchPlatform,
+}
+
+pub trait ArchPlatformTrait {
+    fn cpu_id_to_mpidr(&self, id: CpuID) -> u64;
 }
 
 const PLAT_ARCH_OFF: usize = size_of::<Platform>() - size_of::<ArchPlatform>();

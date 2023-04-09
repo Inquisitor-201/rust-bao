@@ -1,4 +1,5 @@
 pub mod page_table;
+pub mod cpu_arch_profile;
 
 use super::{defs::*, sysregs::*};
 use crate::baocore::cpu::CPU_SIZE;

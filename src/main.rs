@@ -1,6 +1,7 @@
 #![no_std]
 #![no_main]
 #![feature(asm_const)]
+#![feature(concat_idents)]
 
 pub mod arch;
 pub mod baocore;

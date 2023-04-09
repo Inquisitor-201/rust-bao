@@ -5,7 +5,7 @@ use super::*;
 pub static PLATFORM: Platform = Platform {
     cpu_num: 4,
     region_num: 1,
-    console: 0x9000000,
+    console_base: 0x9000000,
     cache: Cache {},
     arch: ArchPlatform {
         gic: GICDescriptor {
@@ -19,8 +19,8 @@ pub static PLATFORM: Platform = Platform {
         smmu: default_smmu_desc(),
         generic_timer: default_generic_timer_desc(),
         clusters: ClustersDescriptor {
-            num: 2,
-            core_nums: [4, 6, 0, 0],
+            num: 1,
+            core_nums: [4, 0, 0, 0],
         },
     },
     // .regions =  (struct mem_region[]) {

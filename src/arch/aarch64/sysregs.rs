@@ -153,3 +153,14 @@ pub const SCTLR_WXN: u64 = 1 << 19;
 pub const SCTLR_EE: u64 = 1 << 25;
 
 pub const SCTLR_DFLT: u64 = SCTLR_RES1 | SCTLR_M | SCTLR_C | SCTLR_I;
+
+
+pub const MPIDR_RES1: u64 = 0x80000000;
+pub const MPIDR_RES0_MSK: u64 = !(0x1f << 25);
+pub const MPIDR_AFFINITY_BITS: u64 = 8;
+pub const MPIDR_U_BIT: u64 = 1 << 30;
+pub const MPIDR_AFF_MSK: u64 = 0xffff;
+
+fn mpidr_aff_lvl(mpidr: u64, lvl: u64) -> u64 {
+    ((mpidr >> (8 * lvl)) & 0xff) as u64
+}

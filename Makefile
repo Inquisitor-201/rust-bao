@@ -1,7 +1,8 @@
+MODE?=debug
 rustup_target:=aarch64-unknown-none
 toolchain_prefix:=aarch64-none-elf
 
-target_dir:=target/$(rustup_target)/release
+target_dir:=target/$(rustup_target)/$(MODE)
 bao_elf:=$(target_dir)/rust-bao
 bao_bin:=$(target_dir)/rust-bao.bin
 bao_disasm:=$(target_dir)/rust-bao.asm
@@ -23,7 +24,7 @@ qemu_flags:=-nographic\
 		-device virtio-serial-device -chardev pty,id=serial3 -device virtconsole,chardev=serial3
 
 build: env
-	cargo build --release && make dump
+	cargo build && make dump
 
 dump:
 	$(toolchain_prefix)-objdump -lS $(bao_elf) > $(bao_disasm)
@@ -36,7 +37,8 @@ gdb: $(bao_bin)
 	@$(qemu_cmd) $(qemu_flags) -s -S
 
 monitor:
-	@gdb-multiarch -ex 'target remote localhost:1234'
+	@gdb-multiarch -ex 'target remote localhost:1234' \
+		-ex 'file $(bao_elf)'
 
 env:
 	rustup target add $(rustup_target)
