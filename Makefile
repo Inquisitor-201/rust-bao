@@ -1,4 +1,4 @@
-MODE?=debug
+MODE?=release
 rustup_target:=aarch64-unknown-none
 toolchain_prefix:=aarch64-none-elf
 
@@ -24,7 +24,7 @@ qemu_flags:=-nographic\
 		-device virtio-serial-device -chardev pty,id=serial3 -device virtconsole,chardev=serial3
 
 build: env
-	cargo build && make dump
+	cargo build --$(MODE) && make dump
 
 dump:
 	$(toolchain_prefix)-objdump -lS $(bao_elf) > $(bao_disasm)

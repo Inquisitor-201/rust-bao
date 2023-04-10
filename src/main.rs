@@ -1,7 +1,7 @@
 #![no_std]
 #![no_main]
 #![feature(asm_const)]
-#![feature(concat_idents)]
+#![feature(alloc_error_handler)]
 
 pub mod arch;
 pub mod baocore;

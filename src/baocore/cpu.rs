@@ -1,6 +1,8 @@
+use spin::Mutex;
+
 use crate::arch::aarch64::{defs::{CPU_STACK_SIZE, BAO_CPU_BASE}, cpu::CpuArch};
 
-use super::types::{CpuID, Paddr};
+use super::{types::{CpuID, Paddr}, mmu::mem::AddrSpace};
 
 #[repr(C)]
 #[repr(align(0x1000))]
@@ -12,7 +14,7 @@ pub struct CpuStack {
 pub struct Cpu {
     pub id: CpuID,
     pub handling_msgs: bool,
-    // addr_space: AddrSpace,
+    pub addr_space: Mutex<AddrSpace>,
     // vcpu: *mut Vcpu,
     pub arch: CpuArch,
     // interface: *mut CpuIf,
