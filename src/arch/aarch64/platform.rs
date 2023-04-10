@@ -10,7 +10,7 @@ impl ArchPlatformTrait for Platform {
         if id as usize > self.cpu_num {
             return !(!MPIDR_RES1 & MPIDR_RES0_MSK); // return an invalid mpidr by inverting res bits
         }
-        
+
         let mut mpidr = 0;
         let mut found = false;
         if self.arch.clusters.num > 0 {
@@ -21,10 +21,10 @@ impl ArchPlatformTrait for Platform {
                     found = true;
                     break;
                 }
-        
+
                 j += self.arch.clusters.core_nums[i] as u64;
             }
-        
+
             if !found {
                 panic!("failed cpuid to mpdir translation");
             }
@@ -32,12 +32,12 @@ impl ArchPlatformTrait for Platform {
             /* No cluster information in configuration. Assume a single cluster. */
             mpidr = id;
         }
-        
+
         mpidr |= MPIDR_RES1;
         if self.cpu_num == 1 {
             mpidr |= MPIDR_U_BIT;
         }
-        
+
         mpidr
     }
 }

@@ -1,10 +1,10 @@
+pub mod allocator;
 pub mod cache;
 pub mod cpu;
-pub mod types;
-pub mod allocator;
-pub mod mmu;
 pub mod mem;
+pub mod mmu;
 pub mod pagetable;
+pub mod types;
 
 use types::{CpuID, Paddr};
 

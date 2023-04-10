@@ -27,3 +27,28 @@ pub const PTE_PAGE: u64 = 3;
 pub const PTE_INVALID: u64 = 0;
 pub const PTE_SUPERPAGE: u64 = 0x1;
 pub const PTE_HYP_FLAGS: u64 = pte_attr(1) | PTE_AP_RW | PTE_SH_IS | PTE_AF;
+
+#[repr(C)]
+pub struct PageTableDescriptor {
+    lvls: usize,
+    lvl_wdt: [usize; 4],
+    lvl_off: [usize; 4],
+    lvl_term: [bool; 4],
+}
+
+const ARMV8_PT_DSCR: PageTableDescriptor = PageTableDescriptor {
+    lvls: 4,
+    lvl_wdt: [48, 39, 30, 21],
+    lvl_off: [39, 30, 21, 12],
+    lvl_term: [false, true, true, true],
+};
+
+const ARMV8_PT_S2_DSCR: PageTableDescriptor = PageTableDescriptor {
+    lvls: 4,
+    lvl_wdt: [48, 39, 30, 21],
+    lvl_off: [39, 30, 21, 12],
+    lvl_term: [false, true, true, true],
+};
+
+pub const HYP_PT_DSCR: &PageTableDescriptor = &ARMV8_PT_DSCR;
+pub const VM_PT_DSCR: &PageTableDescriptor = &ARMV8_PT_S2_DSCR;

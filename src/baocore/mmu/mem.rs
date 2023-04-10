@@ -1,9 +1,13 @@
-use crate::baocore::{
-    cpu::cpu,
-    mem::root_pt,
-    pagetable::Pagetable,
-    types::{AsType, Asid, ColorMap},
+use crate::{
+    arch::aarch64::armv8_a::pagetable::{HYP_PT_DSCR, VM_PT_DSCR},
+    baocore::{
+        cpu::cpu,
+        pagetable::{root_pt_addr, Pagetable},
+        types::{AsType, Asid, ColorMap, Vaddr},
+    },
 };
+
+pub const HYP_ASID: u64 = 0;
 
 #[repr(C)]
 pub struct AddrSpace {
@@ -18,23 +22,32 @@ pub trait AsArchTrait {
 }
 
 impl AddrSpace {
-    pub fn init(&mut self, as_type: AsType, colors: ColorMap, id: Asid) {
+    pub fn init(&mut self, as_type: AsType, id: Asid, root_pt: Vaddr, colors: ColorMap) {
         self.as_type = as_type;
         self.colors = colors;
-        self.id = id
+        self.id = id;
+
+        if root_pt == 0 {
+            unimplemented!();
+        }
+
+        self.pt = Pagetable {
+            root: root_pt,
+            desc: match as_type {
+                AsType::AsVM => VM_PT_DSCR,
+                _ => HYP_PT_DSCR,
+            },
+        };
+
+        self.arch_init();
     }
 }
 
 pub fn mem_prot_init() {
     // let root_pt = (((cpu() as usize) + size_of::<Cpu>()) as u64).align_up(PAGE_SIZE) as *mut pte_t;
-    let root_pt = root_pt();
-    unsafe {
-        as_init(
-            cpu().addr_space,
-            AS_HYP,
-            HYP_ASID,
-            root_pt,
-            HypConfig::get().hyp.colors,
-        );
-    }
+    let root_pt = root_pt_addr();
+    cpu()
+        .addr_space
+        .lock()
+        .init(AsType::AsHyp, HYP_ASID, root_pt, 0);
 }

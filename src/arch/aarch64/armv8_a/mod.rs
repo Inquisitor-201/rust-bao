@@ -1,11 +1,11 @@
-pub mod page_table;
 pub mod cpu_arch_profile;
 pub mod mem;
+pub mod pagetable;
 
 use super::{defs::*, sysregs::*};
 use crate::baocore::cpu::CPU_SIZE;
 use core::arch::global_asm;
-use page_table::*;
+use pagetable::*;
 
 pub const PT_LVLS: usize = 4;
 

@@ -1,8 +1,14 @@
 use spin::Mutex;
 
-use crate::arch::aarch64::{defs::{CPU_STACK_SIZE, BAO_CPU_BASE}, cpu::CpuArch};
+use crate::arch::aarch64::{
+    cpu::CpuArch,
+    defs::{BAO_CPU_BASE, CPU_STACK_SIZE},
+};
 
-use super::{types::{CpuID, Paddr}, mmu::mem::AddrSpace};
+use super::{
+    mmu::mem::AddrSpace,
+    types::{CpuID, Paddr},
+};
 
 #[repr(C)]
 #[repr(align(0x1000))]

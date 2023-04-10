@@ -154,7 +154,6 @@ pub const SCTLR_EE: u64 = 1 << 25;
 
 pub const SCTLR_DFLT: u64 = SCTLR_RES1 | SCTLR_M | SCTLR_C | SCTLR_I;
 
-
 pub const MPIDR_RES1: u64 = 0x80000000;
 pub const MPIDR_RES0_MSK: u64 = !(0x1f << 25);
 pub const MPIDR_AFFINITY_BITS: u64 = 8;

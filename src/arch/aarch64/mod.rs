@@ -1,8 +1,8 @@
 pub mod armv8_a;
-pub mod defs;
-pub mod sysregs;
 pub mod cpu;
+pub mod defs;
 pub mod platform;
+pub mod sysregs;
 
 use core::arch::global_asm;
 

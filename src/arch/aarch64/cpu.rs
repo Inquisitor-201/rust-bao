@@ -1,6 +1,6 @@
 use crate::baocore::{
     cpu::{Cpu, CpuArchTrait},
-    types::{Paddr, CpuID},
+    types::{CpuID, Paddr},
 };
 use aarch64::regs::*;
 use tock_registers::interfaces::Readable;

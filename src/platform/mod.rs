@@ -2,7 +2,10 @@
 
 pub mod qemu_aarch64_virt;
 
-use crate::baocore::{cache::Cache, types::{Paddr, CpuID}};
+use crate::baocore::{
+    cache::Cache,
+    types::{CpuID, Paddr},
+};
 use core::mem::size_of;
 
 #[repr(C)]
