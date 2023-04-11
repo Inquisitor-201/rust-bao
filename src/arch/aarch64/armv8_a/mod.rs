@@ -1,5 +1,6 @@
 pub mod cpu_arch_profile;
 pub mod mem;
+#[macro_use]
 pub mod pagetable;
 
 use super::{defs::*, sysregs::*};

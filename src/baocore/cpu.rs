@@ -1,8 +1,6 @@
-use spin::Mutex;
-
 use crate::arch::aarch64::{
     cpu::CpuArch,
-    defs::{BAO_CPU_BASE, CPU_STACK_SIZE},
+    defs::{BAO_CPU_BASE, CPU_STACK_SIZE}, armv8_a::cpu_arch_profile::CPU_MASTER,
 };
 
 use super::{
@@ -20,11 +18,17 @@ pub struct CpuStack {
 pub struct Cpu {
     pub id: CpuID,
     pub handling_msgs: bool,
-    pub addr_space: Mutex<AddrSpace>,
+    pub addr_space: AddrSpace,
     // vcpu: *mut Vcpu,
     pub arch: CpuArch,
     // interface: *mut CpuIf,
     stack: CpuStack,
+}
+
+impl Cpu {
+    pub fn is_master(&self) -> bool {
+        self.id == unsafe { CPU_MASTER }
+    }
 }
 
 pub trait CpuArchTrait {

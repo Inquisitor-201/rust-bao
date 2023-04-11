@@ -30,10 +30,10 @@ pub const PTE_HYP_FLAGS: u64 = pte_attr(1) | PTE_AP_RW | PTE_SH_IS | PTE_AF;
 
 #[repr(C)]
 pub struct PageTableDescriptor {
-    lvls: usize,
-    lvl_wdt: [usize; 4],
-    lvl_off: [usize; 4],
-    lvl_term: [bool; 4],
+    pub lvls: usize,
+    pub lvl_wdt: [usize; 4],
+    pub lvl_off: [usize; 4],
+    pub lvl_term: [bool; 4],
 }
 
 const ARMV8_PT_DSCR: PageTableDescriptor = PageTableDescriptor {
@@ -52,3 +52,13 @@ const ARMV8_PT_S2_DSCR: PageTableDescriptor = PageTableDescriptor {
 
 pub const HYP_PT_DSCR: &PageTableDescriptor = &ARMV8_PT_DSCR;
 pub const VM_PT_DSCR: &PageTableDescriptor = &ARMV8_PT_S2_DSCR;
+
+#[macro_export]
+macro_rules! pt_cpu_rec_index {
+    () => { crate::baocore::cpu::cpu().addr_space.pt.pt_nentries(0) - 1 };
+}
+
+#[macro_export]
+macro_rules! pt_vm_rec_index {
+    () => { crate::baocore::cpu::cpu().addr_space.pt.pt_nentries(0) - 2 };
+}

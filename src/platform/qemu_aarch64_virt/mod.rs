@@ -5,6 +5,10 @@ use super::*;
 pub static PLATFORM: Platform = Platform {
     cpu_num: 4,
     region_num: 1,
+    regions: [
+        MemRegion::new(0x40000000, 0x100000000),
+        MemRegion::new(0, 0),
+    ],
     console_base: 0x9000000,
     cache: Cache {},
     arch: ArchPlatform {

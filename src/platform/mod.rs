@@ -4,7 +4,7 @@ pub mod qemu_aarch64_virt;
 
 use crate::baocore::{
     cache::Cache,
-    types::{CpuID, Paddr},
+    types::{CpuID, Paddr}, mem::MemRegion,
 };
 use core::mem::size_of;
 
@@ -67,7 +67,7 @@ const fn default_clusters_desc() -> ClustersDescriptor {
 pub struct Platform {
     pub cpu_num: usize,
     pub region_num: usize,
-    // struct mem_region *regions;
+    pub regions: [MemRegion; 2],
     pub console_base: Paddr,
     pub cache: Cache,
     pub arch: ArchPlatform,

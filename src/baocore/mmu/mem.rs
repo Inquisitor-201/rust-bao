@@ -3,8 +3,8 @@ use crate::{
     baocore::{
         cpu::cpu,
         pagetable::{root_pt_addr, Pagetable},
-        types::{AsType, Asid, ColorMap, Vaddr},
-    },
+        types::{AsType, Asid, ColorMap, Vaddr, AsSec, MemFlags}, mem::PPages,
+    }, util::BaoResult,
 };
 
 pub const HYP_ASID: u64 = 0;
@@ -33,13 +33,34 @@ impl AddrSpace {
 
         self.pt = Pagetable {
             root: root_pt,
-            desc: match as_type {
+            dscr: match as_type {
                 AsType::AsVM => VM_PT_DSCR,
                 _ => HYP_PT_DSCR,
             },
         };
 
         self.arch_init();
+    }
+
+    pub fn mem_alloc_vpage(
+        &mut self,
+        section: AsSec,
+        at: Option<Vaddr>,
+        num_pages: usize,
+    ) -> BaoResult<Vaddr> {
+        
+    }
+
+    pub fn mem_alloc_map(
+        &mut self,
+        section: AsSec,
+        ppages: Option<&mut PPages>,
+        at: Option<Vaddr>,
+        num_pages: usize,
+        flags: MemFlags,
+    ) -> BaoResult<Vaddr> {
+        let address = self.mem_alloc_vpage(section, at, num_pages);
+
     }
 }
 
@@ -48,6 +69,5 @@ pub fn mem_prot_init() {
     let root_pt = root_pt_addr();
     cpu()
         .addr_space
-        .lock()
         .init(AsType::AsHyp, HYP_ASID, root_pt, 0);
 }

@@ -7,7 +7,13 @@ use super::{cpu::Cpu, types::Vaddr};
 #[repr(C)]
 pub struct Pagetable {
     pub root: Vaddr,
-    pub desc: &'static PageTableDescriptor,
+    pub dscr: &'static PageTableDescriptor,
+}
+
+impl Pagetable {
+    pub fn pt_nentries(&self, lvl: usize) -> usize {
+        (1 << self.dscr.lvl_wdt[lvl]) >> self.dscr.lvl_off[lvl]
+    }
 }
 
 pub fn root_pt_addr() -> Vaddr {
