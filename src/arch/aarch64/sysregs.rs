@@ -1,6 +1,13 @@
 #![allow(unused)]
 #![allow(non_upper_case_globals)]
 
+use core::arch::asm;
+
+use aarch64::regs::PAR_EL1;
+use tock_registers::interfaces::Readable;
+
+use crate::baocore::types::Vaddr;
+
 // TCR - Translation Control Register
 pub const TCR_RES1: u64 = (1 << 23) | (1 << 31);
 pub const TCR_T0SZ_MSK: u64 = 0x1f << 0;
@@ -160,6 +167,25 @@ pub const MPIDR_AFFINITY_BITS: u64 = 8;
 pub const MPIDR_U_BIT: u64 = 1 << 30;
 pub const MPIDR_AFF_MSK: u64 = 0xffff;
 
-fn mpidr_aff_lvl(mpidr: u64, lvl: u64) -> u64 {
+pub const PAR_F: u64 = 1;
+pub const PAR_PA_MSK: u64 = 0x3ffffff << 12;
+
+pub fn mpidr_aff_lvl(mpidr: u64, lvl: u64) -> u64 {
     ((mpidr >> (8 * lvl)) & 0xff) as u64
+}
+
+pub fn arm_at_s1e2w(vaddr: Vaddr) -> u64 {
+    unsafe {
+        asm!("at s1e2w, {}", in(reg) vaddr);
+        asm!("isb");
+        PAR_EL1.get()
+    }
+}
+
+pub fn arm_at_s12e1w(vaddr: Vaddr) -> u64 {
+    unsafe {
+        asm!("at s12e1w, {}", in(reg) vaddr);
+        asm!("isb");
+        PAR_EL1.get()
+    }
 }

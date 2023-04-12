@@ -16,7 +16,7 @@ pub fn range_in_range(base1: usize, size1: usize, base2: usize, size2: usize) ->
     (base1 >= base2) && (limit1 <= limit2)
 }
 
-pub const fn image_size() -> usize {
+pub fn image_size() -> usize {
     extern "C" {
         static _image_start: usize;
         static _image_end: usize;
@@ -24,7 +24,7 @@ pub const fn image_size() -> usize {
     unsafe { &_image_end as *const _ as usize - &_image_start as *const _ as usize }
 }
 
-pub const fn vm_image_size() -> usize {
+pub fn vm_image_size() -> usize {
     extern "C" {
         static _vm_image_start: usize;
         static _vm_image_end: usize;
@@ -50,7 +50,6 @@ pub fn num_pages(sz: usize) -> usize {
 
 pub const PAGE_OFFSET_MASK: usize = PAGE_SIZE - 1;
 pub const PAGE_FRAME_MASK: usize = !PAGE_OFFSET_MASK;
-
 
 #[derive(Debug)]
 pub enum BaoError {

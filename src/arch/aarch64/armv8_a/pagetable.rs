@@ -1,5 +1,9 @@
 #![allow(unused)]
 
+use core::mem::size_of;
+
+use crate::baocore::types::{Vaddr, Paddr};
+
 const fn addr_msk(msb: u64, lsb: u64) -> u64 {
     ((1u64 << (msb + 1)) - 1) & !((1u64 << lsb) - 1)
 }
@@ -55,10 +59,31 @@ pub const VM_PT_DSCR: &PageTableDescriptor = &ARMV8_PT_S2_DSCR;
 
 #[macro_export]
 macro_rules! pt_cpu_rec_index {
-    () => { crate::baocore::cpu::cpu().addr_space.pt.pt_nentries(0) - 1 };
+    () => { crate::baocore::cpu::mycpu().addr_space.pt.pt_nentries(0) - 1 };
 }
 
 #[macro_export]
 macro_rules! pt_vm_rec_index {
-    () => { crate::baocore::cpu::cpu().addr_space.pt.pt_nentries(0) - 2 };
+    () => { crate::baocore::cpu::mycpu().addr_space.pt.pt_nentries(0) - 2 };
+}
+
+#[repr(C)]
+pub struct PTE(pub u64);
+
+pub const PTE_SIZE: usize = size_of::<PTE>();
+
+impl PTE {
+    pub fn refmut_from_va(va: Vaddr) -> &'static mut Self {
+        unsafe { &mut *(va as *mut Self) }
+    }
+
+    pub fn new(pa: Paddr, pte_type: u64, pte_flags: u64) -> Self {
+        Self((pa & PTE_ADDR_MSK) | ((pte_type | pte_flags) & PTE_FLAGS_MSK))
+    }
+}
+
+#[repr(C)]
+pub struct PageTableArch {
+    pub rec_index: usize,
+    pub rec_mask: u64,
 }

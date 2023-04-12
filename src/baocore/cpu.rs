@@ -37,12 +37,12 @@ pub trait CpuArchTrait {
 
 pub const CPU_SIZE: usize = core::mem::size_of::<Cpu>();
 
-pub fn cpu() -> &'static mut Cpu {
+pub fn mycpu() -> &'static mut Cpu {
     unsafe { &mut *(BAO_CPU_BASE as *mut Cpu) }
 }
 
 pub fn init(cpu_id: CpuID, load_addr: Paddr) {
-    let mycpu = cpu();
+    let mycpu = mycpu();
     mycpu.id = cpu_id;
     mycpu.handling_msgs = false;
     mycpu.arch_init(load_addr);

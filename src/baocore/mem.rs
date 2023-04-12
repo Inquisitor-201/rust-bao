@@ -1,12 +1,12 @@
 use core::mem::{size_of, MaybeUninit};
 
 use super::{
-    cpu::{cpu, Cpu},
-    mmu::mem::mem_prot_init,
+    cpu::{mycpu, Cpu},
+    mmu::{sections::SEC_HYP_GLOBAL, mem::mem_prot_init},
     types::{ColorMap, Paddr},
 };
 use crate::{
-    arch::aarch64::defs::PAGE_SIZE,
+    arch::aarch64::{defs::PAGE_SIZE, armv8_a::pagetable::PTE_HYP_FLAGS},
     platform::PLATFORM,
     util::{image_size, range_in_range, vm_image_size, BaoError, BaoResult},
 };
@@ -42,11 +42,15 @@ pub struct MemPagePool {
 impl MemPagePool {
     pub fn set_up_bitmap(&self, load_addr: Paddr) -> BaoResult<()> {
         let cpu_size =
-            PLATFORM.cpu_num * (size_of::<Cpu>() + cpu().addr_space.pt.dscr.lvls * PAGE_SIZE);
+            PLATFORM.cpu_num * (size_of::<Cpu>() + mycpu().addr_space.pt.dscr.lvls * PAGE_SIZE);
         let bitmap_num_pages = self.size.div_ceil(8 * PAGE_SIZE);
         let bitmap_base =
             load_addr + image_size() as u64 + vm_image_size() as u64 + cpu_size as u64;
-        let bitmap_pp = PPages::mem_ppages_get(bitmap_base, bitmap_num_pages);
+        let mut bitmap_pp = PPages::mem_ppages_get(bitmap_base, bitmap_num_pages);
+        mycpu()
+            .addr_space
+            .mem_alloc_map(SEC_HYP_GLOBAL, Some(&mut bitmap_pp), None, 1, PTE_HYP_FLAGS)?;
+        loop {}
     }
 }
 
@@ -74,9 +78,10 @@ impl MemRegion {
             free: pool_sz,
             last: 0,
         };
-        page_pool.set_up_bitmap()?;
-        page_pool.reserve_hyp_mem()?;
+        page_pool.set_up_bitmap(load_addr)?;
+        // page_pool.reserve_hyp_mem()?;
         self.page_pool.write(page_pool);
+        todo!()
     }
 }
 
@@ -97,13 +102,14 @@ fn mem_find_root_region(load_addr: Paddr) -> BaoResult<&'static mut MemRegion> {
 
 fn mem_setup_root_pool(load_addr: Paddr) -> BaoResult<&'static mut MemRegion> {
     let root_mem_region = mem_find_root_region(load_addr)?;
-    root_mem_region.page_pool_root_init()?;
+    root_mem_region.page_pool_root_init(load_addr)?;
+    Ok(root_mem_region)
 }
 
 pub fn init(load_addr: Paddr) {
     mem_prot_init();
-    if cpu().is_master() {
+    if mycpu().is_master() {
         // todo: cache_arch_enumerate()
-        mem_setup_root_pool(load_addr)
+        mem_setup_root_pool(load_addr);
     }
 }

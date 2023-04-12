@@ -9,4 +9,3 @@ todo:
 5. `colors` unimplemented
 6. todo: recursive mapping
 7. todo: cache_enumerate
-8. todo: set_up_bitmap cpu_size ?????
