@@ -2,11 +2,14 @@ OUTPUT_ARCH(aarch64)
 ENTRY(_el2_entry)
 
 PAGE_SIZE = 0x1000;
-BASE_ADDRESS = 0xfd8000000000;
+BAO_VAS_BASE = 0xfd8000000000;
+BAO_CPU_BASE = 0xfe0000000000;
+BAO_VM_BASE = 0xfe8000000000;
+BAO_VAS_TOP = 0xff0000000000;
 
 SECTIONS
 {
-    . = BASE_ADDRESS;
+    . = BAO_VAS_BASE;
     _image_start = ABSOLUTE(.);
     .boot : {
         *(.boot.entry)
@@ -84,5 +87,4 @@ SECTIONS
 
 	. = ALIGN(PAGE_SIZE);
 	_dmem_beg = ABSOLUTE(.);
-
 }

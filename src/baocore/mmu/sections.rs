@@ -1,7 +1,7 @@
 use lazy_static::lazy_static;
 use spin::{Mutex, MutexGuard};
 
-use crate::baocore::types::{AsSecID, AsType, Vaddr, MAX_VA};
+use crate::{baocore::types::{AsSecID, AsType, Vaddr, MAX_VA}, arch::aarch64::defs::{BAO_CPU_BASE, BAO_VM_BASE, BAO_VAS_TOP}};
 
 pub const SEC_HYP_GLOBAL: AsSecID = 0;
 pub const SEC_HYP_IMAGE: AsSecID = 1;
@@ -19,12 +19,8 @@ pub struct Section {
 
 extern "C" {
     static _dmem_beg: usize;
-    static _cpu_private_beg: usize;
-    static _cpu_private_end: usize;
     static _image_start: usize;
     static _image_end: usize;
-    static _vm_beg: usize;
-    static _vm_end: usize;
 }
 
 lazy_static! {
@@ -33,7 +29,7 @@ lazy_static! {
             id: 0,
             is_hyp_sec: true,
             beg: unsafe { &_dmem_beg as *const _ as Vaddr },
-            end: unsafe { &_cpu_private_beg as *const _ as Vaddr - 1 },
+            end: BAO_CPU_BASE as Vaddr - 1,
             shared: true,
         },
         Section {    // SEC_HYP_IMAGE
@@ -46,15 +42,15 @@ lazy_static! {
         Section {    // SEC_HYP_PRIVATE
             id: 2,
             is_hyp_sec: true,
-            beg: unsafe { &_cpu_private_beg as *const _ as Vaddr },
-            end: unsafe { &_cpu_private_end as *const _ as Vaddr - 1 },
+            beg: BAO_CPU_BASE as Vaddr,
+            end: BAO_VM_BASE as Vaddr - 1,
             shared: false,
         },
         Section {     // SEC_HYP_VM
             id: 3,
             is_hyp_sec: true,
-            beg: unsafe { &_vm_beg as *const _ as Vaddr },
-            end: unsafe { &_vm_beg as *const _ as Vaddr - 1 },
+            beg: BAO_VM_BASE as Vaddr,
+            end: BAO_VAS_TOP as Vaddr - 1,
             shared: true,
         },
     ];

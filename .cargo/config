@@ -3,6 +3,6 @@ target = "aarch64-unknown-none"
 
 [target.aarch64-unknown-none]
 rustflags = [
-    "-Clink-arg=-Tsrc/linker.ld", "-Cforce-frame-pointers=yes",
+    "-Clink-arg=-Tsrc/linker_mmu.ld", "-Cforce-frame-pointers=yes",
     "-Ctarget-feature=+v8.1a"
 ]

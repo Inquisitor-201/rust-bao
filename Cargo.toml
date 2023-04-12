@@ -13,7 +13,6 @@ lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 
 [profile.release]
 debug = 2
-opt = 1
 
 [target.aarch64-unknown-none.dependencies]
 aarch64 = "0.0.7"

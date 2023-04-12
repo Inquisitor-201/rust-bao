@@ -198,8 +198,8 @@ impl AddrSpace {
         num_pages: usize,
         flags: MemFlags,
     ) -> BaoResult<Vaddr> {
-        let address = self.mem_alloc_vpage(section, at, num_pages);
-        todo!()
+        self.mem_alloc_vpage(section, at, num_pages);
+        loop {}
         // let sections =
     }
 
