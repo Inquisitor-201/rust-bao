@@ -1,7 +1,9 @@
 use core::mem::size_of;
 
 use crate::arch::aarch64::{
-    armv8_a::pagetable::{PageTableDescriptor, PTE, PTE_SIZE, PTE_HYP_FLAGS, PTE_TABLE, PageTableArch},
+    armv8_a::pagetable::{
+        PageTableArch, PageTableDescriptor, PTE, PTE_HYP_FLAGS, PTE_SIZE, PTE_TABLE,
+    },
     defs::BAO_CPU_BASE,
 };
 
@@ -14,7 +16,7 @@ use super::{
 pub struct Pagetable {
     pub root: Vaddr,
     pub dscr: &'static PageTableDescriptor,
-    pub arch: PageTableArch
+    pub arch: PageTableArch,
 }
 
 impl Pagetable {
@@ -31,7 +33,7 @@ impl Pagetable {
         for i in 0..self.dscr.lvls {
             let lvl_off = self.dscr.lvl_off[i];
             self.arch.rec_mask |= (index as u64) << lvl_off;
-        } 
+        }
     }
 }
 

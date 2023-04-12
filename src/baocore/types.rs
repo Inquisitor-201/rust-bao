@@ -18,5 +18,3 @@ pub enum AsType {
     AsVM,
     AsHypCry,
 }
-
-

@@ -2,11 +2,11 @@ use core::mem::{size_of, MaybeUninit};
 
 use super::{
     cpu::{mycpu, Cpu},
-    mmu::{sections::SEC_HYP_GLOBAL, mem::mem_prot_init},
+    mmu::{mem::mem_prot_init, sections::SEC_HYP_GLOBAL},
     types::{ColorMap, Paddr},
 };
 use crate::{
-    arch::aarch64::{defs::PAGE_SIZE, armv8_a::pagetable::PTE_HYP_FLAGS},
+    arch::aarch64::{armv8_a::pagetable::PTE_HYP_FLAGS, defs::PAGE_SIZE},
     platform::PLATFORM,
     util::{image_size, range_in_range, vm_image_size, BaoError, BaoResult},
 };
@@ -47,9 +47,13 @@ impl MemPagePool {
         let bitmap_base =
             load_addr + image_size() as u64 + vm_image_size() as u64 + cpu_size as u64;
         let mut bitmap_pp = PPages::mem_ppages_get(bitmap_base, bitmap_num_pages);
-        mycpu()
-            .addr_space
-            .mem_alloc_map(SEC_HYP_GLOBAL, Some(&mut bitmap_pp), None, 1, PTE_HYP_FLAGS)?;
+        mycpu().addr_space.mem_alloc_map(
+            SEC_HYP_GLOBAL,
+            Some(&mut bitmap_pp),
+            None,
+            1,
+            PTE_HYP_FLAGS,
+        )?;
         loop {}
     }
 }

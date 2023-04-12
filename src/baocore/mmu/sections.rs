@@ -1,7 +1,7 @@
 use lazy_static::lazy_static;
 use spin::{Mutex, MutexGuard};
 
-use crate::baocore::types::{AsType, Vaddr, MAX_VA, AsSecID};
+use crate::baocore::types::{AsSecID, AsType, Vaddr, MAX_VA};
 
 pub const SEC_HYP_GLOBAL: AsSecID = 0;
 pub const SEC_HYP_IMAGE: AsSecID = 1;

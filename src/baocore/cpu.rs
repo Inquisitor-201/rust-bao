@@ -1,6 +1,7 @@
 use crate::arch::aarch64::{
+    armv8_a::cpu_arch_profile::CPU_MASTER,
     cpu::CpuArch,
-    defs::{BAO_CPU_BASE, CPU_STACK_SIZE}, armv8_a::cpu_arch_profile::CPU_MASTER,
+    defs::{BAO_CPU_BASE, CPU_STACK_SIZE},
 };
 
 use super::{

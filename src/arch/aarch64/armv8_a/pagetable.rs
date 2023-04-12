@@ -2,7 +2,7 @@
 
 use core::mem::size_of;
 
-use crate::baocore::types::{Vaddr, Paddr};
+use crate::baocore::types::{Paddr, Vaddr};
 
 const fn addr_msk(msb: u64, lsb: u64) -> u64 {
     ((1u64 << (msb + 1)) - 1) & !((1u64 << lsb) - 1)
@@ -59,12 +59,16 @@ pub const VM_PT_DSCR: &PageTableDescriptor = &ARMV8_PT_S2_DSCR;
 
 #[macro_export]
 macro_rules! pt_cpu_rec_index {
-    () => { crate::baocore::cpu::mycpu().addr_space.pt.pt_nentries(0) - 1 };
+    () => {
+        crate::baocore::cpu::mycpu().addr_space.pt.pt_nentries(0) - 1
+    };
 }
 
 #[macro_export]
 macro_rules! pt_vm_rec_index {
-    () => { crate::baocore::cpu::mycpu().addr_space.pt.pt_nentries(0) - 2 };
+    () => {
+        crate::baocore::cpu::mycpu().addr_space.pt.pt_nentries(0) - 2
+    };
 }
 
 #[repr(C)]
