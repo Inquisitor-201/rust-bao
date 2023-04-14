@@ -1,4 +1,4 @@
-MODE?=release
+MODE?=debug
 rustup_target:=aarch64-unknown-none
 toolchain_prefix:=aarch64-none-elf
 

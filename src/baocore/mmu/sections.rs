@@ -1,7 +1,9 @@
-use lazy_static::lazy_static;
-use spin::{Mutex, MutexGuard};
+use spin::{Mutex, MutexGuard, Once};
 
-use crate::{baocore::types::{AsSecID, AsType, Vaddr, MAX_VA}, arch::aarch64::defs::{BAO_CPU_BASE, BAO_VM_BASE, BAO_VAS_TOP}};
+use crate::{
+    arch::aarch64::defs::{BAO_CPU_BASE, BAO_VAS_TOP, BAO_VM_BASE},
+    baocore::types::{AsSecID, AsType, Vaddr, MAX_VA},
+};
 
 pub const SEC_HYP_GLOBAL: AsSecID = 0;
 pub const SEC_HYP_IMAGE: AsSecID = 1;
@@ -23,47 +25,22 @@ extern "C" {
     static _image_end: usize;
 }
 
-lazy_static! {
-    static ref HYP_SECS: [Section; 4] = [
-        Section {    // SEC_HYP_GLOBAL
-            id: 0,
-            is_hyp_sec: true,
-            beg: unsafe { &_dmem_beg as *const _ as Vaddr },
-            end: BAO_CPU_BASE as Vaddr - 1,
-            shared: true,
-        },
-        Section {    // SEC_HYP_IMAGE
-            id: 1,
-            is_hyp_sec: true,
-            beg: unsafe { &_image_start as *const _ as Vaddr },
-            end: unsafe { &_image_end as *const _ as Vaddr - 1 },
-            shared: true,
-        },
-        Section {    // SEC_HYP_PRIVATE
-            id: 2,
-            is_hyp_sec: true,
-            beg: BAO_CPU_BASE as Vaddr,
-            end: BAO_VM_BASE as Vaddr - 1,
-            shared: false,
-        },
-        Section {     // SEC_HYP_VM
-            id: 3,
-            is_hyp_sec: true,
-            beg: BAO_VM_BASE as Vaddr,
-            end: BAO_VAS_TOP as Vaddr - 1,
-            shared: true,
-        },
-    ];
-    static ref VM_SECS: [Section; 1] = [Section { // SEC_VM_ANY
-        id: 0,
-        is_hyp_sec: false,
-        beg: 0x0,
-        end: MAX_VA,
-        shared: false,
-    },];
-    static ref HYP_SECS_LOCKS: [Mutex<()>; 4] = [Mutex::new(()), Mutex::new(()), Mutex::new(()), Mutex::new(())];
-    static ref VM_SECS_LOCKS: [Mutex<()>; 1] = [Mutex::new(())];
-}
+pub static HYP_SECS: Once<[Section; 4]> = Once::new();
+pub static VM_SECS: [Section; 1] = [Section {
+    // SEC_VM_ANY
+    id: 0,
+    is_hyp_sec: false,
+    beg: 0x0,
+    end: MAX_VA,
+    shared: false,
+}];
+pub static HYP_SECS_LOCKS: [Mutex<()>; 4] = [
+    Mutex::new(()),
+    Mutex::new(()),
+    Mutex::new(()),
+    Mutex::new(()),
+];
+pub static VM_SECS_LOCKS: [Mutex<()>; 1] = [Mutex::new(())];
 
 pub struct Sections {
     pub sec: &'static [Section],
@@ -82,7 +59,42 @@ impl Section {
 pub fn mem_get_sections(as_type: AsType) -> Sections {
     match as_type {
         AsType::AsHyp | AsType::AsHypCry => Sections {
-            sec: HYP_SECS.as_ref(),
+            sec: HYP_SECS.call_once(|| {
+                [
+                    Section {
+                        // SEC_HYP_GLOBAL
+                        id: 0,
+                        is_hyp_sec: true,
+                        beg: unsafe { &_dmem_beg as *const _ as Vaddr },
+                        end: BAO_CPU_BASE as Vaddr - 1,
+                        shared: true,
+                    },
+                    Section {
+                        // SEC_HYP_IMAGE
+                        id: 1,
+                        is_hyp_sec: true,
+                        beg: unsafe { &_image_start as *const _ as Vaddr },
+                        end: unsafe { &_image_end as *const _ as Vaddr - 1 },
+                        shared: true,
+                    },
+                    Section {
+                        // SEC_HYP_PRIVATE
+                        id: 2,
+                        is_hyp_sec: true,
+                        beg: BAO_CPU_BASE as Vaddr,
+                        end: BAO_VM_BASE as Vaddr - 1,
+                        shared: false,
+                    },
+                    Section {
+                        // SEC_HYP_VM
+                        id: 3,
+                        is_hyp_sec: true,
+                        beg: BAO_VM_BASE as Vaddr,
+                        end: BAO_VAS_TOP as Vaddr - 1,
+                        shared: true,
+                    },
+                ]
+            }),
         },
         AsType::AsVM => Sections {
             sec: VM_SECS.as_ref(),

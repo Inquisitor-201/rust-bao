@@ -77,7 +77,6 @@ impl AddrSpace {
     ) -> BaoResult<Vaddr> {
         let mut count = 0;
         let mut failed = false;
-
         let sections = mem_get_sections(self.as_type);
         let sec = match sections.sec.get(section as usize) {
             Some(sec) => sec,
