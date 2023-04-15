@@ -61,7 +61,7 @@ pub fn hvc32(function: u32, args: [u32; 7]) -> [u32; 8] {
 
 /// Makes an SMC32 call to the firmware, following the SMC Calling Convention version 1.3.
 #[inline(always)]
-pub fn smc32(function: u32, args: [u32; 7]) -> [u32; 8] {
+pub fn smc32(_function: u32, _args: [u32; 7]) -> [u32; 8] {
     #[cfg(target_arch = "aarch64")]
     unimplemented!();
     // unsafe {

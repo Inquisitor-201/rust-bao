@@ -51,7 +51,7 @@ impl MemPagePool {
             SEC_HYP_GLOBAL,
             Some(&mut bitmap_pp),
             None,
-            1,
+            bitmap_num_pages,
             PTE_HYP_FLAGS,
         )?;
         loop {}
@@ -76,7 +76,7 @@ impl MemRegion {
 
     pub fn page_pool_root_init(&mut self, load_addr: Paddr) -> BaoResult<()> {
         let pool_sz = self.size / PAGE_SIZE;
-        let mut page_pool = MemPagePool {
+        let page_pool = MemPagePool {
             base: self.base,
             size: pool_sz,
             free: pool_sz,

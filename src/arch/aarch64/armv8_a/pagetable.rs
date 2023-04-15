@@ -2,17 +2,23 @@
 
 use core::mem::size_of;
 
-use crate::baocore::types::{Paddr, Vaddr};
+use crate::{
+    arch::aarch64::defs::PAGE_SIZE,
+    baocore::{
+        pagetable::Pagetable,
+        types::{Paddr, Vaddr},
+    },
+};
 
-const fn addr_msk(msb: u64, lsb: u64) -> u64 {
+pub const fn addr_msk(msb: u64, lsb: u64) -> u64 {
     ((1u64 << (msb + 1)) - 1) & !((1u64 << lsb) - 1)
 }
 
-const fn pte_mask(off: u64, len: u64) -> u64 {
+pub const fn pte_mask(off: u64, len: u64) -> u64 {
     ((1 << len) - 1) << off
 }
 
-const fn pte_attr(n: u64) -> u64 {
+pub const fn pte_attr(n: u64) -> u64 {
     (n << PTE_ATTR_OFF) & PTE_ATTR_MSK
 }
 
@@ -27,10 +33,18 @@ pub const PTE_SH_IS: u64 = 0x3u64 << PTE_SH_OFF;
 pub const PTE_AF: u64 = 1u64 << 10;
 pub const PTE_TABLE: u64 = 3;
 pub const PTE_PAGE: u64 = 3;
+pub const PTE_TYPE_MSK: u64 = 0x3;
 
 pub const PTE_INVALID: u64 = 0;
+pub const PTE_VALID: u64 = 0x1;
 pub const PTE_SUPERPAGE: u64 = 0x1;
 pub const PTE_HYP_FLAGS: u64 = pte_attr(1) | PTE_AP_RW | PTE_SH_IS | PTE_AF;
+
+pub const PTE_RSW_OFF: u64 = 55;
+pub const PTE_RSW_WDT: u64 = 4;
+pub const PTE_RSW_MSK: u64 =
+    ((1u64 << (PTE_RSW_OFF + PTE_RSW_WDT)) - 1) - ((1u64 << (PTE_RSW_OFF)) - 1);
+pub const PTE_RSW_RSRV: u64 = 0x3 << PTE_RSW_OFF;
 
 #[repr(C)]
 pub struct PageTableDescriptor {
@@ -72,17 +86,40 @@ macro_rules! pt_vm_rec_index {
 }
 
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub struct PTE(pub u64);
 
 pub const PTE_SIZE: usize = size_of::<PTE>();
 
 impl PTE {
-    pub fn refmut_from_va(va: Vaddr) -> &'static mut Self {
-        unsafe { &mut *(va as *mut Self) }
-    }
-
     pub fn new(pa: Paddr, pte_type: u64, pte_flags: u64) -> Self {
         Self((pa & PTE_ADDR_MSK) | ((pte_type | pte_flags) & PTE_FLAGS_MSK))
+    }
+
+    pub fn check_rsw(&self, flag: u64) -> bool {
+        self.0 & PTE_RSW_MSK == flag & PTE_RSW_MSK
+    }
+
+    pub fn is_valid(&self) -> bool {
+        (self.0 & PTE_VALID) != 0
+    }
+
+    pub fn is_table(&self, pt: &Pagetable, lvl: usize) -> bool {
+        lvl != pt.dscr.lvls - 1 && (self.0 & PTE_TYPE_MSK == PTE_TABLE)
+    }
+
+    pub fn is_allocable(&self, pt: &Pagetable, lvl: usize, left: usize, addr: Vaddr) -> bool {
+        let lvlsize = pt.pt_lvlsize(lvl);
+        lvl == pt.dscr.lvls - 1
+            || pt.dscr.lvl_term[lvl]
+                && !self.is_valid()
+                && lvlsize <= left * PAGE_SIZE
+                && addr % lvlsize as u64 == 0
+    }
+
+    pub fn set_rsw(&mut self, flag: u64) {
+        self.0 &= !PTE_RSW_MSK;
+        self.0 |= flag & PTE_RSW_MSK;
     }
 }
 

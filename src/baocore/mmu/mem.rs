@@ -4,7 +4,7 @@ use tock_registers::interfaces::{Readable, Writeable};
 
 use crate::{
     arch::aarch64::{
-        armv8_a::pagetable::{PageTableArch, HYP_PT_DSCR, VM_PT_DSCR},
+        armv8_a::pagetable::{PageTableArch, HYP_PT_DSCR, PTE_RSW_RSRV, VM_PT_DSCR},
         defs::PAGE_SIZE,
         sysregs::{arm_at_s12e1w, arm_at_s1e2w, PAR_F, PAR_PA_MSK},
     },
@@ -14,7 +14,7 @@ use crate::{
         pagetable::{root_pt_addr, Pagetable},
         types::{AsSecID, AsType, Asid, ColorMap, MemFlags, Paddr, Vaddr, MAX_VA},
     },
-    util::{is_aligned, BaoError, BaoResult},
+    util::{is_aligned, BaoResult},
 };
 
 use super::sections::mem_get_sections;
@@ -74,22 +74,23 @@ impl AddrSpace {
         section: AsSecID,
         at: Option<Vaddr>,
         n: usize,
-    ) -> BaoResult<Vaddr> {
+    ) -> Option<Vaddr> {
+        let mut lvl = 0;
         let mut count = 0;
         let mut failed = false;
         let sections = mem_get_sections(self.as_type);
         let sec = match sections.sec.get(section as usize) {
             Some(sec) => sec,
-            None => return Err(BaoError::InvalidParam),
+            None => return None,
         };
 
-        let addr = match at {
+        let mut addr = match at {
             Some(at) => {
                 if self
                     .mem_find_sec(at)
                     .map_or(true, |found_sec| found_sec != section)
                 {
-                    return Err(BaoError::InvalidParam);
+                    return None;
                 }
                 at
             }
@@ -99,7 +100,7 @@ impl AddrSpace {
         let top = sec.end;
 
         if addr > top || !is_aligned(addr as usize, PAGE_SIZE) {
-            return Err(BaoError::InvalidParam);
+            return None;
         }
 
         let _sec_lock;
@@ -108,85 +109,82 @@ impl AddrSpace {
             _sec_lock = sec.lock();
         }
 
-        let mut vpage;
+        let mut vpage = None;
         while count < n && !failed {
             // Check if there is still enough space in the address space.
             // The corner case of top being the highest address in the address
             // space and the target address being 0 is handled separate
             let full_as = addr == 0 && top == MAX_VA;
             if !full_as && ((top + 1 - addr) as usize / PAGE_SIZE) < n {
-                vpage = usize::MAX;
+                vpage = None;
                 failed = true;
                 break;
             }
 
-            // pte = Some(pt_get_pte(self.pt, lvl, addr));
-            // entry = pt_getpteindex(&as.pt, pte.unwrap(), lvl);
-            // nentries = pt_nentries(&as.pt, lvl);
-            // lvlsze = pt_lvlsize(&as.pt, lvl);
+            let mut pte_ptr = self.pt.pt_get_pte(lvl, addr);
+            let mut entry = self.pt.pt_getpteindex(pte_ptr, lvl);
+            let nentries = self.pt.pt_nentries(lvl);
+            let lvlsz = self.pt.pt_lvlsize(lvl);
 
-            //     while (entry < nentries) && (count < n) && !failed {
-            //         if pte_check_rsw(pte.unwrap(), PTE_RSW_RSRV) || (pte_valid(pte.unwrap()) && !pte_table(&as.pt, pte.unwrap(), lvl)) {
-            //             count = 0;
-            //             vpage = INVALID_VA;
-            //             if at != INVALID_VA {
-            //                 failed = true;
-            //                 break;
-            //             }
-            //         } else if !pte_valid(pte.unwrap()) {
-            //             if pte_allocable(as, pte.unwrap(), lvl, n - count, addr) {
-            //                 if count == 0 {
-            //                     vpage = addr;
-            //                 }
-            //                 count += lvlsze / PAGE_SIZE;
-            //             } else {
-            //                 if mem_alloc_pt(as, pte.unwrap(), lvl, addr).is_null() {
-            //                     ERROR("failed to alloc page table");
-            //                 }
-            //             }
-            //         }
+            while entry < nentries && count < n && !failed {
+                let pte = unsafe { *pte_ptr };
+                if pte.check_rsw(PTE_RSW_RSRV) || pte.is_valid() && !pte.is_table(&self.pt, lvl) {
+                    count = 0;
+                    vpage = None;
+                    if at.is_some() {
+                        failed = true;
+                        break;
+                    }
+                } else if !pte.is_valid() {
+                    if pte.is_allocable(&self.pt, lvl, n - count, addr) {
+                        if count == 0 {
+                            vpage = Some(addr);
+                        }
+                        count += lvlsz / PAGE_SIZE;
+                    } else {
+                        todo!("mem alloc page");
+                    }
+                }
 
-            //         if pte_table(&as.pt, pte.unwrap(), lvl) {
-            //             lvl += 1;
-            //             break;
-            //         } else {
-            //             pte = Some(unsafe { pte.unwrap().add(1) });
-            //             addr += lvlsze;
-            //             if entry + 1 >= nentries {
-            //                 lvl = 0;
-            //                 break;
-            //             }
-            //             entry += 1;
-            //         }
-            //     }
-            // }
-
-            // if vpage != INVALID_VA && !failed {
-            //     count = 0;
-            //     addr = vpage;
-            //     let mut lvl = 0;
-            //     while count < n {
-            //         for lvl in 0..as.pt.dscr.lvls {
-            //             pte = Some(pt_get_pte(&mut as.pt, lvl, addr));
-            //             if !pte_valid(pte.unwrap()) {
-            //                 break;
-            //             }
-            //         }
-            //         pte_set_rsw(pte.unwrap(), PTE_RSW_RSRV);
-            //         addr += pt_lvlsize(&as.pt, lvl);
-            //         count += pt_lvlsize(&as.pt, lvl) / PAGE_SIZE;
-            //     }
-            // }
-
-            // if sec.shared {
-            //     spin_unlock(&sec.lock);
-            // }
-
-            // spin_unlock(&as.lock);
-
-            // vpage
+                if pte.is_table(&self.pt, lvl) {
+                    lvl += 1;
+                    break;
+                } else {
+                    unsafe {
+                        pte_ptr = pte_ptr.add(1);
+                    }
+                    entry += 1;
+                    addr += lvlsz as u64;
+                    if entry > nentries {
+                        lvl = 0;
+                        break;
+                    }
+                }
+            }
         }
-        todo!()
+
+        if vpage.is_some() && !failed {
+            let mut count = 0;
+            let mut addr = vpage.unwrap();
+            let lvl = 0;
+            while count < n {
+                let mut pte_ptr = None;
+                for lvl in 0..self.pt.dscr.lvls {
+                    let p = self.pt.pt_get_pte(lvl, addr);
+                    if !unsafe { *p }.is_valid() {
+                        pte_ptr = Some(p);
+                        break;
+                    }
+                }
+                assert!(pte_ptr.is_some());
+                unsafe { *pte_ptr.unwrap() }.set_rsw(PTE_RSW_RSRV);
+                let lvlsize = self.pt.pt_lvlsize(lvl);
+                addr += lvlsize as u64;
+                count += lvlsize / PAGE_SIZE;
+            }
+        }
+
+        vpage
     }
 
     pub fn mem_alloc_map(
@@ -197,7 +195,9 @@ impl AddrSpace {
         num_pages: usize,
         flags: MemFlags,
     ) -> BaoResult<Vaddr> {
-        self.mem_alloc_vpage(section, at, num_pages);
+        match self.mem_alloc_vpage(section, at, num_pages) {
+            Some(va) => self.mem_map(va, ppages, num_pages, flags);
+        }
         loop {}
         // let sections =
     }
