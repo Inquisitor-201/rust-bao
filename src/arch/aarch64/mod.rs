@@ -3,6 +3,7 @@ pub mod cpu;
 pub mod defs;
 pub mod platform;
 pub mod sysregs;
+pub mod interrupts;
 
 use core::arch::global_asm;
 

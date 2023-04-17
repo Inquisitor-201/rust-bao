@@ -288,5 +288,5 @@ pub fn init(load_addr: Paddr) {
         add_page_pool(&mut mem_region.page_pool);
         heap::init();
     }
-    CPU_SYNC_TOKEN.sync_and_clear_msg();
+    // CPU_SYNC_TOKEN.sync_and_clear_msg();
 }
