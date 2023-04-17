@@ -14,7 +14,7 @@ use crate::{
         pagetable::{root_pt_addr, Pagetable},
         types::{AsSecID, AsType, Asid, ColorMap, MemFlags, Paddr, Vaddr, MAX_VA},
     },
-    util::{is_aligned, BaoResult, PAGE_FRAME_MASK, BaoError},
+    util::{is_aligned, BaoResult, BaoError},
 };
 
 use super::sections::mem_get_sections;

@@ -19,15 +19,9 @@
 //     panic!("Heap allocation error, layout = {:?}", layout);
 // }
 
-// #[no_mangle]
 // pub fn heap_init(cpu_id: CpuID) {
-//     if cpu_id == unsafe { CPU_MASTER } {
-//         let heap_start = unsafe { HEAP.as_ptr() as usize };
-//         unsafe {
-//             HEAP_ALLOCATOR.lock().init(heap_start, HV_HEAP_SIZE);
-//         }
-//         HEAP_INIT_OK.store(true, Ordering::Release)
-//     } else {
-//         while !HEAP_INIT_OK.load(Ordering::Acquire) {}
+//     let heap_start = unsafe { HEAP.as_ptr() as usize };
+//     unsafe {
+//         HEAP_ALLOCATOR.lock().init(heap_start, HV_HEAP_SIZE);
 //     }
 // }

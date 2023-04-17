@@ -197,10 +197,10 @@ pub fn init(load_addr: Paddr) {
     mem_prot_init();
     if mycpu().is_master() {
         // todo: cache_arch_enumerate()
-        match mem_setup_root_pool(load_addr) {
-            Ok(va) => {}
-            _ => {}
-        }
+        let mem_region = match mem_setup_root_pool(load_addr) {
+            Ok(m) => m,
+            Err(e) => panic!("{:#x?}", e)
+        };
     }
     loop {}
 }

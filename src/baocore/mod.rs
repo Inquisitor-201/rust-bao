@@ -1,4 +1,4 @@
-pub mod allocator;
+pub mod heap;
 pub mod cache;
 pub mod cpu;
 pub mod mem;
