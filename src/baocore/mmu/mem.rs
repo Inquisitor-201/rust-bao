@@ -4,17 +4,20 @@ use tock_registers::interfaces::{Readable, Writeable};
 
 use crate::{
     arch::aarch64::{
-        armv8_a::{pagetable::{PageTableArch, HYP_PT_DSCR, PTE_RSW_RSRV, VM_PT_DSCR, PTE}, fences::fence_sync},
+        armv8_a::{
+            fences::fence_sync,
+            pagetable::{PageTableArch, HYP_PT_DSCR, PTE, PTE_RSW_RSRV, VM_PT_DSCR},
+        },
         defs::PAGE_SIZE,
         sysregs::{arm_at_s12e1w, arm_at_s1e2w, PAR_F, PAR_PA_MSK},
     },
     baocore::{
         cpu::mycpu,
-        mem::PPages,
+        mem::{mem_alloc_ppages, PPages},
         pagetable::{root_pt_addr, Pagetable},
         types::{AsSecID, AsType, Asid, ColorMap, MemFlags, Paddr, Vaddr, MAX_VA},
     },
-    util::{is_aligned, BaoResult, BaoError},
+    util::{is_aligned, BaoError, BaoResult},
 };
 
 use super::sections::mem_get_sections;
@@ -205,7 +208,10 @@ impl AddrSpace {
             return Err(BaoError::NotFound);
         }
 
-        let sec = mem_get_sections(self.as_type).sec.get(sec.unwrap() as usize).unwrap();
+        let sec = mem_get_sections(self.as_type)
+            .sec
+            .get(sec.unwrap() as usize)
+            .unwrap();
 
         let _sec_lock;
         let _as_lock = self.lock.lock();
@@ -222,13 +228,7 @@ impl AddrSpace {
                 pte = Some(self.pt.pt_get_pte(lvl, vaddr));
                 if self.pt.dscr.lvl_term[lvl] {
                     let pte = unsafe { *pte.unwrap() };
-                    if pte.is_mappable(
-                        &self.pt,
-                        lvl,
-                        num_pages - count,
-                        vaddr,
-                        paddr,
-                    ) {
+                    if pte.is_mappable(&self.pt, lvl, num_pages - count, vaddr, paddr) {
                         break;
                     } else if !pte.is_valid() {
                         todo!("mem alloc page");
@@ -244,28 +244,18 @@ impl AddrSpace {
             let nentries = self.pt.pt_nentries(lvl);
             let lvlsz = self.pt.pt_lvlsize(lvl);
 
-            while entry < nentries
-                && count < num_pages
-                && num_pages - count >= lvlsz / PAGE_SIZE
-            {
+            while entry < nentries && count < num_pages && num_pages - count >= lvlsz / PAGE_SIZE {
                 if ppages.is_none() {
-                    todo!("ppages is none");
-                    // let mut temp = mem_alloc_ppages(self.colors, lvlsz / PAGE_SIZE, true);
-                    // if temp.num_pages < lvlsz / PAGE_SIZE {
-                    //     if lvl == self.pt.dscr.lvls {
-                    //         // TODO: free previously allocated pages
-                    //         panic!("failed to alloc physical pages");
-                    //     } else {
-                    //         pte = Some(self.pt.get_pte(lvl, vaddr));
-                    //         if !pte_valid(pte.unwrap()) {
-                    //             self.mem_alloc_pt(pte.as_mut().unwrap(), lvl, vaddr);
-                    //         }
-                    //         break;
-                    //     }
-                    // }
-                    // paddr = temp.base;
+                    match mem_alloc_ppages(lvlsz / PAGE_SIZE, false) {
+                        Some(ppages) => {
+                            paddr = ppages.base;
+                        }
+                        None => return Err(BaoError::OutOfMemory),
+                    }
                 }
-                unsafe { *(pte.unwrap()) = PTE::new(paddr, self.pt.page_type(lvl), flags); }
+                unsafe {
+                    *(pte.unwrap()) = PTE::new(paddr, self.pt.page_type(lvl), flags);
+                }
                 vaddr += lvlsz as u64;
                 paddr += lvlsz as u64;
                 count += lvlsz / PAGE_SIZE;
@@ -287,7 +277,7 @@ impl AddrSpace {
     ) -> BaoResult<Vaddr> {
         match self.mem_alloc_vpage(section, at, num_pages) {
             Some(va) => self.mem_map(va, ppages, num_pages, flags),
-            _ => Err(BaoError::NotFound)
+            _ => Err(BaoError::NotFound),
         }
     }
 

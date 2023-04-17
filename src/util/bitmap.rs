@@ -81,4 +81,32 @@ impl Bitmap {
             self.set(start + i);
         }
     }
+
+    pub fn find_consec(&self, start: usize, n: usize, set: bool) -> Option<usize> {
+        assert!(start < self.size_bytes * 8);
+        let mut consec_count = 0;
+        let mut consec_start = None;
+
+        for i in start..(self.size_bytes * 8) {
+            if self.get(i) == set {
+                if consec_count == 0 {
+                    consec_start = Some(i);
+                }
+                consec_count += 1;
+            } else {
+                consec_count = 0;
+                consec_start = None;
+            }
+
+            if consec_count == n {
+                break;
+            }
+        }
+
+        if consec_count == n {
+            consec_start
+        } else {
+            None
+        }
+    }
 }

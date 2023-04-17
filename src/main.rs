@@ -4,6 +4,8 @@
 #![feature(alloc_error_handler)]
 #![feature(int_roundings)]
 
+extern crate alloc;
+
 pub mod arch;
 pub mod baocore;
 pub mod platform;

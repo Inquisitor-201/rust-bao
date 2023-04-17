@@ -1,18 +1,69 @@
 use core::mem::MaybeUninit;
 
+use spin::{Lazy, Mutex};
+
 use super::{
-    cpu::{mem_cpu_boot_alloc_size, mycpu},
+    cpu::{mem_cpu_boot_alloc_size, mycpu, CPU_SYNC_TOKEN},
     mmu::{mem::mem_prot_init, sections::SEC_HYP_GLOBAL},
-    types::{ColorMap, Paddr},
+    types::{ColorMap, Paddr}, heap,
 };
 use crate::{
     arch::aarch64::{armv8_a::pagetable::PTE_HYP_FLAGS, defs::PAGE_SIZE},
     platform::PLATFORM,
     util::{
-        bitmap::Bitmap, image_load_size, image_noload_size, image_size, num_pages,
-        range_in_range, vm_image_size, BaoError, BaoResult,
+        bitmap::Bitmap, image_load_size, image_noload_size, image_size, num_pages, range_in_range,
+        vm_image_size, BaoError, BaoResult,
     },
 };
+
+pub const MAX_PAGE_POOLS: usize = 8;
+
+pub struct PagePools {
+    pools: [Option<&'static mut MemPagePool>; MAX_PAGE_POOLS],
+}
+
+#[allow(invalid_value)]
+pub static PAGE_POOLS: Lazy<Mutex<PagePools>> = Lazy::new(|| {
+    Mutex::new(PagePools {
+        pools: {
+            let mut pools: [Option<&'static mut MemPagePool>; MAX_PAGE_POOLS] =
+                unsafe { MaybeUninit::uninit().assume_init() };
+            for i in 0..MAX_PAGE_POOLS {
+                pools[i] = None;
+            }
+            pools
+        },
+    })
+});
+
+impl PagePools {
+    pub fn insert(&mut self, pool: &'static mut MemPagePool) {
+        for p in self.pools.iter_mut() {
+            if p.is_none() {
+                *p = Some(pool);
+                return;
+            }
+        }
+        panic!("can't find free slot in PagePools");
+    }
+}
+
+pub fn add_page_pool(pool: &'static mut MemPagePool) {
+    PAGE_POOLS.lock().insert(pool);
+}
+
+pub fn mem_alloc_ppages(num_pages: usize, aligned: bool) -> Option<PPages> {
+    let mut r = PAGE_POOLS.lock();
+    for pp in r.pools.iter_mut() {
+        if let Some(pp) = pp {
+            let ppages = pp.alloc(num_pages, aligned);
+            if ppages.is_some() {
+                return ppages;
+            }
+        };
+    }
+    None
+}
 
 #[repr(C)]
 pub struct PPages {
@@ -22,7 +73,7 @@ pub struct PPages {
 }
 
 impl PPages {
-    pub fn mem_ppages_get(base: Paddr, n: usize) -> Self {
+    pub fn new(base: Paddr, n: usize) -> Self {
         Self {
             base: base,
             num_pages: n,
@@ -33,13 +84,12 @@ impl PPages {
 
 #[repr(C)]
 pub struct MemPagePool {
-    // node: node_t,
     base: Paddr,
     size: usize,
     free: usize,
     last: usize,
     bitmap: Option<Bitmap>,
-    // lock: spinlock_t,
+    lock: Mutex<()>,
 }
 
 impl MemPagePool {
@@ -48,7 +98,7 @@ impl MemPagePool {
         let bitmap_num_pages = self.size.div_ceil(8 * PAGE_SIZE);
         let bitmap_base =
             load_addr + image_size() as u64 + vm_image_size() as u64 + cpu_size as u64;
-        let mut bitmap_pp = PPages::mem_ppages_get(bitmap_base, bitmap_num_pages);
+        let mut bitmap_pp = PPages::new(bitmap_base, bitmap_num_pages);
         let root_bitmap = mycpu().addr_space.mem_alloc_map(
             SEC_HYP_GLOBAL,
             Some(&mut bitmap_pp),
@@ -123,10 +173,9 @@ impl MemPagePool {
         let image_noload_addr = load_addr + image_load_size as u64 + vm_image_size as u64;
         let cpu_base_addr = image_noload_addr + image_noload_size as u64;
 
-        let images_load_ppages = PPages::mem_ppages_get(load_addr, num_pages(image_load_size));
-        let images_noload_ppages =
-            PPages::mem_ppages_get(image_noload_addr, num_pages(image_noload_size));
-        let cpu_ppages = PPages::mem_ppages_get(cpu_base_addr, num_pages(cpu_size));
+        let images_load_ppages = PPages::new(load_addr, num_pages(image_load_size));
+        let images_noload_ppages = PPages::new(image_noload_addr, num_pages(image_noload_size));
+        let cpu_ppages = PPages::new(cpu_base_addr, num_pages(cpu_size));
 
         let image_load_reserved = self.reserve_ppages(&images_load_ppages);
         let image_noload_reserved = self.reserve_ppages(&images_noload_ppages);
@@ -138,13 +187,40 @@ impl MemPagePool {
             Err(BaoError::AlreadyExists)
         }
     }
+
+    pub fn alloc(&mut self, num_pages: usize, aligned: bool) -> Option<PPages> {
+        assert!(!aligned);
+        if self.free < num_pages {
+            return None;
+        }
+        if num_pages == 0 {
+            return Some(PPages::new(0, 0));
+        }
+        let _lock = self.lock.lock();
+
+        let mut curr = self.last;
+        let bitmap = self.bitmap.as_mut().unwrap();
+        for _ in 0..2 {
+            match bitmap.find_consec(curr, num_pages, false) {
+                Some(bit) => {
+                    let p = PPages::new(self.base + (bit * PAGE_SIZE) as u64, num_pages);
+                    bitmap.set_consecutive(bit, num_pages);
+                    self.free -= num_pages;
+                    self.last = bit + num_pages;
+                    return Some(p);
+                }
+                None => curr = 0,
+            }
+        }
+        None
+    }
 }
 
 #[repr(C)]
 pub struct MemRegion {
     base: Paddr,
     size: usize,
-    page_pool: MaybeUninit<MemPagePool>,
+    page_pool: MemPagePool,
 }
 
 impl MemRegion {
@@ -152,7 +228,14 @@ impl MemRegion {
         MemRegion {
             base,
             size,
-            page_pool: MaybeUninit::uninit(),
+            page_pool: MemPagePool {
+                base: 0,
+                size: 0,
+                free: 0,
+                last: 0,
+                bitmap: None,
+                lock: Mutex::new(()),
+            },
         }
     }
 
@@ -164,10 +247,11 @@ impl MemRegion {
             free: pool_sz,
             last: 0,
             bitmap: None,
+            lock: Mutex::new(()),
         };
         page_pool.set_up_bitmap(load_addr)?;
         page_pool.reserve_hyp_mem(load_addr)?;
-        self.page_pool.write(page_pool);
+        self.page_pool = page_pool;
         Ok(())
     }
 }
@@ -199,8 +283,10 @@ pub fn init(load_addr: Paddr) {
         // todo: cache_arch_enumerate()
         let mem_region = match mem_setup_root_pool(load_addr) {
             Ok(m) => m,
-            Err(e) => panic!("{:#x?}", e)
+            Err(e) => panic!("{:#x?}", e),
         };
+        add_page_pool(&mut mem_region.page_pool);
+        heap::init();
     }
-    loop {}
+    CPU_SYNC_TOKEN.sync_and_clear_msg();
 }
