@@ -2,7 +2,8 @@ use core::mem::size_of;
 
 use crate::arch::aarch64::{
     armv8_a::pagetable::{
-        pte_mask, PageTableArch, PageTableDescriptor, PTE, PTE_HYP_FLAGS, PTE_SIZE, PTE_TABLE,
+        pte_mask, PageTableArch, PageTableDescriptor, PTE, PTE_HYP_FLAGS, PTE_PAGE, PTE_SIZE,
+        PTE_SUPERPAGE, PTE_TABLE,
     },
     defs::BAO_CPU_BASE,
 };
@@ -59,6 +60,14 @@ impl Pagetable {
 
     pub fn pt_lvlsize(&self, lvl: usize) -> usize {
         1 << self.dscr.lvl_off[lvl]
+    }
+
+    pub fn page_type(&self, lvl: usize) -> u64 {
+        if lvl == self.dscr.lvls - 1 {
+            PTE_PAGE
+        } else {
+            PTE_SUPERPAGE
+        }
     }
 }
 

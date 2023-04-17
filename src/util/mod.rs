@@ -1,3 +1,5 @@
+pub mod bitmap;
+
 use crate::arch::aarch64::defs::PAGE_SIZE;
 
 #[inline]
@@ -30,6 +32,22 @@ pub fn vm_image_size() -> usize {
         static _vm_image_end: usize;
     }
     unsafe { &_vm_image_end as *const _ as usize - &_vm_image_start as *const _ as usize }
+}
+
+pub fn image_load_size() -> usize {
+    extern "C" {
+        static _image_load_end: usize;
+        static _image_start: usize;
+    }
+    unsafe { &_image_load_end as *const _ as usize - &_image_start as *const _ as usize }
+}
+
+pub fn image_noload_size() -> usize {
+    extern "C" {
+        static _image_end: usize;
+        static _image_load_end: usize;
+    }
+    unsafe { &_image_end as *const _ as usize - &_image_load_end as *const _ as usize }
 }
 
 pub fn align(val: usize, to: usize) -> usize {

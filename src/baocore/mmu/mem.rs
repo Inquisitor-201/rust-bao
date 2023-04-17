@@ -4,7 +4,7 @@ use tock_registers::interfaces::{Readable, Writeable};
 
 use crate::{
     arch::aarch64::{
-        armv8_a::pagetable::{PageTableArch, HYP_PT_DSCR, PTE_RSW_RSRV, VM_PT_DSCR},
+        armv8_a::{pagetable::{PageTableArch, HYP_PT_DSCR, PTE_RSW_RSRV, VM_PT_DSCR, PTE}, fences::fence_sync},
         defs::PAGE_SIZE,
         sysregs::{arm_at_s12e1w, arm_at_s1e2w, PAR_F, PAR_PA_MSK},
     },
@@ -14,7 +14,7 @@ use crate::{
         pagetable::{root_pt_addr, Pagetable},
         types::{AsSecID, AsType, Asid, ColorMap, MemFlags, Paddr, Vaddr, MAX_VA},
     },
-    util::{is_aligned, BaoResult},
+    util::{is_aligned, BaoResult, PAGE_FRAME_MASK, BaoError},
 };
 
 use super::sections::mem_get_sections;
@@ -187,6 +187,96 @@ impl AddrSpace {
         vpage
     }
 
+    pub fn mem_map(
+        &self,
+        va: Vaddr,
+        ppages: Option<&mut PPages>,
+        num_pages: usize,
+        flags: MemFlags,
+    ) -> BaoResult<Vaddr> {
+        assert!(is_aligned(va as usize, PAGE_SIZE));
+        let mut count = 0;
+        let mut pte = None;
+        let mut vaddr = va;
+
+        let sec = self.mem_find_sec(vaddr);
+
+        if sec.is_none() || sec != self.mem_find_sec(vaddr + (num_pages * PAGE_SIZE) as u64 - 1) {
+            return Err(BaoError::NotFound);
+        }
+
+        let sec = mem_get_sections(self.as_type).sec.get(sec.unwrap() as usize).unwrap();
+
+        let _sec_lock;
+        let _as_lock = self.lock.lock();
+        if sec.shared {
+            _sec_lock = sec.lock();
+        }
+
+        // todo: colors
+
+        let mut paddr = ppages.as_ref().map_or(0, |ppages| ppages.base);
+        while count < num_pages {
+            let mut lvl = 0;
+            for _ in 0..self.pt.dscr.lvls {
+                pte = Some(self.pt.pt_get_pte(lvl, vaddr));
+                if self.pt.dscr.lvl_term[lvl] {
+                    let pte = unsafe { *pte.unwrap() };
+                    if pte.is_mappable(
+                        &self.pt,
+                        lvl,
+                        num_pages - count,
+                        vaddr,
+                        paddr,
+                    ) {
+                        break;
+                    } else if !pte.is_valid() {
+                        todo!("mem alloc page");
+                        // self.mem_alloc_pt(pte, lvl, vaddr);
+                    } else if !pte.is_table(&self.pt, lvl) {
+                        panic!("trying to override previous mapping");
+                    }
+                }
+                lvl += 1;
+            }
+
+            let entry = self.pt.pt_getpteindex(pte.unwrap(), lvl);
+            let nentries = self.pt.pt_nentries(lvl);
+            let lvlsz = self.pt.pt_lvlsize(lvl);
+
+            while entry < nentries
+                && count < num_pages
+                && num_pages - count >= lvlsz / PAGE_SIZE
+            {
+                if ppages.is_none() {
+                    todo!("ppages is none");
+                    // let mut temp = mem_alloc_ppages(self.colors, lvlsz / PAGE_SIZE, true);
+                    // if temp.num_pages < lvlsz / PAGE_SIZE {
+                    //     if lvl == self.pt.dscr.lvls {
+                    //         // TODO: free previously allocated pages
+                    //         panic!("failed to alloc physical pages");
+                    //     } else {
+                    //         pte = Some(self.pt.get_pte(lvl, vaddr));
+                    //         if !pte_valid(pte.unwrap()) {
+                    //             self.mem_alloc_pt(pte.as_mut().unwrap(), lvl, vaddr);
+                    //         }
+                    //         break;
+                    //     }
+                    // }
+                    // paddr = temp.base;
+                }
+                unsafe { *(pte.unwrap()) = PTE::new(paddr, self.pt.page_type(lvl), flags); }
+                vaddr += lvlsz as u64;
+                paddr += lvlsz as u64;
+                count += lvlsz / PAGE_SIZE;
+                pte = Some(unsafe { pte.unwrap().add(1) });
+            }
+        }
+
+        fence_sync();
+        Ok(va)
+    }
+
     pub fn mem_alloc_map(
         &mut self,
         section: AsSecID,
@@ -196,10 +286,9 @@ impl AddrSpace {
         flags: MemFlags,
     ) -> BaoResult<Vaddr> {
         match self.mem_alloc_vpage(section, at, num_pages) {
-            Some(va) => self.mem_map(va, ppages, num_pages, flags);
+            Some(va) => self.mem_map(va, ppages, num_pages, flags),
+            _ => Err(BaoError::NotFound)
         }
-        loop {}
-        // let sections =
     }
 
     pub fn mem_translate(&self, va: Vaddr) -> Option<Paddr> {

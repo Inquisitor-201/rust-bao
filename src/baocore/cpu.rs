@@ -1,7 +1,9 @@
+use core::mem::size_of;
+
 use crate::arch::aarch64::{
     armv8_a::cpu_arch_profile::CPU_MASTER,
     cpu::CpuArch,
-    defs::{BAO_CPU_BASE, CPU_STACK_SIZE},
+    defs::{BAO_CPU_BASE, CPU_STACK_SIZE, PAGE_SIZE},
 };
 
 use super::{
@@ -40,6 +42,10 @@ pub const CPU_SIZE: usize = core::mem::size_of::<Cpu>();
 
 pub fn mycpu() -> &'static mut Cpu {
     unsafe { &mut *(BAO_CPU_BASE as *mut Cpu) }
+}
+
+pub fn mem_cpu_boot_alloc_size() -> usize {
+    size_of::<Cpu>() + mycpu().addr_space.pt.dscr.lvls * PAGE_SIZE
 }
 
 pub fn init(cpu_id: CpuID, load_addr: Paddr) {

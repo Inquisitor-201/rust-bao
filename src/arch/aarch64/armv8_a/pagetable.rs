@@ -117,6 +117,21 @@ impl PTE {
                 && addr % lvlsize as u64 == 0
     }
 
+    pub fn is_mappable(
+        &self,
+        pt: &Pagetable,
+        lvl: usize,
+        left: usize,
+        vaddr: Vaddr,
+        paddr: Paddr,
+    ) -> bool {
+        let lvlsize = pt.pt_lvlsize(lvl);
+        !self.is_valid()
+            && lvlsize <= left * PAGE_SIZE
+            && vaddr as usize % lvlsize == 0
+            && paddr as usize % lvlsize == 0
+    }
+
     pub fn set_rsw(&mut self, flag: u64) {
         self.0 &= !PTE_RSW_MSK;
         self.0 |= flag & PTE_RSW_MSK;
