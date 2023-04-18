@@ -20,7 +20,6 @@ impl CpuArchProfileTrait for CpuArch {
                 psci::cpu_on(mpdir, load_addr, 0).unwrap_or_else(|err| {
                     if let psci::error::Error::AlreadyOn = err {
                     } else {
-                        loop {}
                         panic!("can't wake up cpu {}", cpu_core_id);
                     }
                 });

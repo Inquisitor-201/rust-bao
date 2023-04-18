@@ -34,11 +34,15 @@ pub const PTE_AF: u64 = 1u64 << 10;
 pub const PTE_TABLE: u64 = 3;
 pub const PTE_PAGE: u64 = 3;
 pub const PTE_TYPE_MSK: u64 = 0x3;
+pub const PTE_XN: u64 = 1 << 54;
 
 pub const PTE_INVALID: u64 = 0;
 pub const PTE_VALID: u64 = 0x1;
 pub const PTE_SUPERPAGE: u64 = 0x1;
+
 pub const PTE_HYP_FLAGS: u64 = pte_attr(1) | PTE_AP_RW | PTE_SH_IS | PTE_AF;
+pub const PTE_HYP_DEV_FLAGS: u64 = pte_attr(2) | PTE_AP_RW | PTE_SH_IS | PTE_AF | PTE_XN;
+// pub const PTE_VM_DEV_FLAGS: u64 = ;
 
 pub const PTE_RSW_OFF: u64 = 55;
 pub const PTE_RSW_WDT: u64 = 4;

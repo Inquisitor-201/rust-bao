@@ -100,7 +100,7 @@ impl SyncToken {
         while self.inner.lock().count < next_count {
             // todo: handle cpu messages
         }
-        // self.sync_barrier();
+        self.sync_barrier();
     }
 }
 

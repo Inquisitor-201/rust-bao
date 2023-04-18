@@ -6,7 +6,7 @@ use crate::{
     arch::aarch64::{
         armv8_a::{
             fences::fence_sync,
-            pagetable::{PageTableArch, HYP_PT_DSCR, PTE, PTE_RSW_RSRV, VM_PT_DSCR},
+            pagetable::{PageTableArch, HYP_PT_DSCR, PTE, PTE_RSW_RSRV, VM_PT_DSCR, PTE_HYP_FLAGS},
         },
         defs::PAGE_SIZE,
         sysregs::{arm_at_s12e1w, arm_at_s1e2w, PAR_F, PAR_PA_MSK},
@@ -193,7 +193,7 @@ impl AddrSpace {
     pub fn mem_map(
         &self,
         va: Vaddr,
-        ppages: Option<&mut PPages>,
+        ppages: Option<&PPages>,
         num_pages: usize,
         flags: MemFlags,
     ) -> BaoResult<Vaddr> {
@@ -270,13 +270,34 @@ impl AddrSpace {
     pub fn mem_alloc_map(
         &mut self,
         section: AsSecID,
-        ppages: Option<&mut PPages>,
+        ppages: Option<&PPages>,
         at: Option<Vaddr>,
         num_pages: usize,
         flags: MemFlags,
     ) -> BaoResult<Vaddr> {
         match self.mem_alloc_vpage(section, at, num_pages) {
             Some(va) => self.mem_map(va, ppages, num_pages, flags),
+            _ => Err(BaoError::NotFound),
+        }
+    }
+
+    pub fn mem_alloc_map_dev(
+        &mut self,
+        section: AsSecID,
+        pa: Paddr,
+        at: Option<Vaddr>,
+        num_pages: usize,
+    ) -> BaoResult<Vaddr> {
+        assert!(is_aligned(pa as _, PAGE_SIZE));
+        match self.mem_alloc_vpage(section, at, num_pages) {
+            Some(va) => {
+                let flags = match self.as_type {
+                    AsType::AsHyp => PTE_HYP_FLAGS,
+                    _ => todo!("PTE_VM_DEV_FLAGS")
+                };
+                let ppages = PPages::new(pa, num_pages);
+                self.mem_map(va, Some(&ppages), num_pages, flags)
+            }
             _ => Err(BaoError::NotFound),
         }
     }
