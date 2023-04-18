@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
-pub mod qemu_aarch64_virt;
 pub mod drivers;
+pub mod qemu_aarch64_virt;
 
 use crate::baocore::{
     cache::Cache,

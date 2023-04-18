@@ -30,7 +30,7 @@ impl Bitmap {
 
         ((byte >> bit_index) & 1) == 1
     }
-    
+
     pub fn set(&self, index: usize) {
         assert!(index < self.size_bytes * 8); // make sure index is in bounds
 

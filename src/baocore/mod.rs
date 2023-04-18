@@ -1,6 +1,6 @@
-pub mod heap;
 pub mod cache;
 pub mod cpu;
+pub mod heap;
 pub mod mem;
 pub mod mmu;
 pub mod pagetable;

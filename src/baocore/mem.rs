@@ -4,8 +4,9 @@ use spin::{Lazy, Mutex};
 
 use super::{
     cpu::{mem_cpu_boot_alloc_size, mycpu, CPU_SYNC_TOKEN},
+    heap,
     mmu::{mem::mem_prot_init, sections::SEC_HYP_GLOBAL},
-    types::{ColorMap, Paddr}, heap,
+    types::{ColorMap, Paddr},
 };
 use crate::{
     arch::aarch64::{armv8_a::pagetable::PTE_HYP_FLAGS, defs::PAGE_SIZE},

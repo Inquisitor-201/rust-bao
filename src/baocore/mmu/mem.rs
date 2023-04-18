@@ -6,7 +6,7 @@ use crate::{
     arch::aarch64::{
         armv8_a::{
             fences::fence_sync,
-            pagetable::{PageTableArch, HYP_PT_DSCR, PTE, PTE_RSW_RSRV, VM_PT_DSCR, PTE_HYP_FLAGS},
+            pagetable::{PageTableArch, HYP_PT_DSCR, PTE, PTE_HYP_FLAGS, PTE_RSW_RSRV, VM_PT_DSCR},
         },
         defs::PAGE_SIZE,
         sysregs::{arm_at_s12e1w, arm_at_s1e2w, PAR_F, PAR_PA_MSK},
@@ -293,7 +293,7 @@ impl AddrSpace {
             Some(va) => {
                 let flags = match self.as_type {
                     AsType::AsHyp => PTE_HYP_FLAGS,
-                    _ => todo!("PTE_VM_DEV_FLAGS")
+                    _ => todo!("PTE_VM_DEV_FLAGS"),
                 };
                 let ppages = PPages::new(pa, num_pages);
                 self.mem_map(va, Some(&ppages), num_pages, flags)
