@@ -177,6 +177,46 @@ pub const ICC_SRE_SRE_BIT: u64 = 0x1;
 pub const ICC_IGRPEN_EL1_ENB_BIT: u64 = 0x1;
 pub const ICC_CTLR_EOIMode_BIT: u32 = 0x1 << 1;
 
+// Hypervisor Configuration Register
+pub const HCR_VM_BIT: u64 = 1 << 0;
+pub const HCR_SWIO_BIT: u64 = 1 << 1;
+pub const HCR_PTW_BIT: u64 = 1 << 2;
+pub const HCR_FMO_BIT: u64 = 1 << 3;
+pub const HCR_IMO_BIT: u64 = 1 << 4;
+pub const HCR_AMO_BIT: u64 = 1 << 5;
+pub const HCR_VF_BIT: u64 = 1 << 6;
+pub const HCR_VI_BIT: u64 = 1 << 7;
+pub const HCR_VSE_BIT: u64 = 1 << 8;
+pub const HCR_FB_BIT: u64 = 1 << 9;
+pub const HCR_BSU_BIT: u64 = 1 << 10;
+pub const HCR_DC_BIT: u64 = 1 << 12;
+pub const HCR_TWI_BIT: u64 = 1 << 13;
+pub const HCR_TWE_BIT: u64 = 1 << 14;
+pub const HCR_TID0_BIT: u64 = 1 << 15;
+pub const HCR_TID1_BIT: u64 = 1 << 16;
+pub const HCR_TID2_BIT: u64 = 1 << 17;
+pub const HCR_TID3_BIT: u64 = 1 << 18;
+pub const HCR_TSC_BIT: u64 = 1 << 19;
+pub const HCR_TIDCP_BIT: u64 = 1 << 20;
+pub const HCR_TACR_BIT: u64 = 1 << 21;
+pub const HCR_TSW_BIT: u64 = 1 << 22;
+pub const HCR_TPC_BIT: u64 = 1 << 23;
+pub const HCR_TPU_BIT: u64 = 1 << 24;
+pub const HCR_TTLB_BIT: u64 = 1 << 25;
+pub const HCR_TVM_BIT: u64 = 1 << 26;
+pub const HCR_TGE_BIT: u64 = 1 << 27;
+pub const HCR_TDZ_BIT: u64 = 1 << 28;
+pub const HCR_HCD_BIT: u64 = 1 << 29;
+pub const HCR_TRVM_BIT: u64 = 1 << 30;
+pub const HCR_RW_BIT: u64 = 1 << 31;
+pub const HCR_CD_BIT: u64 = 1 << 32;
+pub const HCR_ID_BIT: u64 = 1 << 33;
+pub const HCR_TERR_BIT: u64 = 1 << 36;
+pub const HCR_TEA_BIT: u64 = 1 << 37;
+pub const HCR_MIOCNCE_BIT: u64 = 1 << 38;
+pub const HCR_APK_BIT: u64 = 1 << 40;
+pub const HCR_API_BIT: u64 = 1 << 41;
+
 pub fn mpidr_aff_lvl(mpidr: u64, lvl: u64) -> u64 {
     ((mpidr >> (8 * lvl)) & 0xff) as u64
 }

@@ -4,6 +4,7 @@ pub mod defs;
 pub mod gic;
 pub mod intr;
 pub mod platform;
+pub mod vmm;
 
 #[macro_use]
 pub mod sysregs;
