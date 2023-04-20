@@ -11,6 +11,7 @@ pub mod arch;
 pub mod baocore;
 pub mod platform;
 pub mod util;
+pub mod config;
 
 use core::panic::PanicInfo;
 

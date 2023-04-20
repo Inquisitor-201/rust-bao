@@ -4,6 +4,7 @@ pub mod mem;
 pub mod pagetable;
 pub mod fences;
 pub mod vmm;
+pub mod vm;
 
 use super::{defs::*, sysregs::*};
 use crate::baocore::cpu::CPU_SIZE;

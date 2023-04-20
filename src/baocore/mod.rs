@@ -7,6 +7,7 @@ pub mod mmu;
 pub mod pagetable;
 pub mod types;
 pub mod vmm;
+pub mod vm;
 
 #[macro_use]
 pub mod console;
