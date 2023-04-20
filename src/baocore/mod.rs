@@ -5,6 +5,7 @@ pub mod mem;
 pub mod mmu;
 pub mod pagetable;
 pub mod types;
+pub mod intr;
 
 #[macro_use]
 pub mod console;
@@ -20,5 +21,6 @@ pub fn init(cpu_id: CpuID, load_addr: Paddr) {
     mem::init(load_addr);
     console::init();
     println!("[Cpu {}] Welcome to rust-bao!", mycpu().id);
+    intr::init();
     loop {}
 }

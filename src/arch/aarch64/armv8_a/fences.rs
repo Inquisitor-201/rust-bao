@@ -17,3 +17,9 @@ pub fn fence_sync_read() {
         asm!("dsb ishst");
     }
 }
+
+pub fn isb() {
+    unsafe {
+        asm!("isb");
+    }
+}

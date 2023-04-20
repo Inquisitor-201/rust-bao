@@ -15,5 +15,5 @@ debug = 2
 
 [target.aarch64-unknown-none.dependencies]
 aarch64 = "0.0.7"
-tock-registers = "0.7"
+tock-registers = {version = "0.7", default-features = false, features = ["register_types"]}
 psci = { path = "vendor/psci", default-features = false, features = ["smc"] }

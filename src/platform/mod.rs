@@ -6,7 +6,7 @@ pub mod qemu_aarch64_virt;
 use crate::baocore::{
     cache::Cache,
     mem::MemRegion,
-    types::{CpuID, Paddr},
+    types::{CpuID, Paddr, IrqID},
 };
 use core::mem::size_of;
 
@@ -20,12 +20,12 @@ pub struct ArchPlatform {
 
 #[repr(C)]
 pub struct GICDescriptor {
-    pub gicc_addr: u64,
-    pub gich_addr: u64,
-    pub gicv_addr: u64,
-    pub gicd_addr: u64,
-    pub gicr_addr: u64,
-    pub maintenance_id: u32,
+    pub gicc_addr: Paddr,
+    pub gich_addr: Paddr,
+    pub gicv_addr: Paddr,
+    pub gicd_addr: Paddr,
+    pub gicr_addr: Paddr,
+    pub maintenance_id: IrqID,
 }
 
 #[repr(C)]

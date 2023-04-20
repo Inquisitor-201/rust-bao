@@ -8,6 +8,7 @@ pub type ColorMap = u64;
 pub type Asid = u64;
 pub type MemFlags = u64;
 pub type AsSecID = u64;
+pub type IrqID = u32;
 
 pub const MAX_VA: Vaddr = Vaddr::MAX - 1;
 

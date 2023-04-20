@@ -6,7 +6,7 @@ use core::arch::asm;
 use aarch64::regs::PAR_EL1;
 use tock_registers::interfaces::Readable;
 
-use crate::baocore::types::Vaddr;
+use crate::{baocore::types::Vaddr, arch::aarch64::armv8_a::fences::isb};
 
 // TCR - Translation Control Register
 pub const TCR_RES1: u64 = (1 << 23) | (1 << 31);
@@ -170,6 +170,13 @@ pub const MPIDR_AFF_MSK: u64 = 0xffff;
 pub const PAR_F: u64 = 1;
 pub const PAR_PA_MSK: u64 = 0x3ffffff << 12;
 
+pub const ICC_SRE_ENB_BIT: u64 = 0x8;
+pub const ICC_SRE_DIB_BIT: u64 = 0x4;
+pub const ICC_SRE_DFB_BIT: u64 = 0x2;
+pub const ICC_SRE_SRE_BIT: u64 = 0x1;
+pub const ICC_IGRPEN_EL1_ENB_BIT: u64 = 0x1;
+pub const ICC_CTLR_EOIMode_BIT: u32 = 0x1 << 1;
+
 pub fn mpidr_aff_lvl(mpidr: u64, lvl: u64) -> u64 {
     ((mpidr >> (8 * lvl)) & 0xff) as u64
 }
@@ -177,7 +184,7 @@ pub fn mpidr_aff_lvl(mpidr: u64, lvl: u64) -> u64 {
 pub fn arm_at_s1e2w(vaddr: Vaddr) -> u64 {
     unsafe {
         asm!("at s1e2w, {}", in(reg) vaddr);
-        asm!("isb");
+        isb();
         PAR_EL1.get()
     }
 }
@@ -185,7 +192,37 @@ pub fn arm_at_s1e2w(vaddr: Vaddr) -> u64 {
 pub fn arm_at_s12e1w(vaddr: Vaddr) -> u64 {
     unsafe {
         asm!("at s12e1w, {}", in(reg) vaddr);
-        asm!("isb");
+        isb();
         PAR_EL1.get()
     }
+}
+
+// *************** GICH Regs **************
+
+#[macro_export]
+macro_rules! read_reg {
+    ($reg_name:ident) => {
+        {
+            let reg_val: u64;
+            unsafe {
+                core::arch::asm!(
+                    concat!("mrs {reg_}, ", stringify!($reg_name)),
+                    reg_ = out(reg) reg_val,
+                );
+            }
+            reg_val
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! write_reg {
+    ($reg_name:ident, $val:expr) => {
+        unsafe {
+            core::arch::asm!(
+                concat!("msr ", stringify!($reg_name), ", {reg_}"),
+                reg_ = in(reg) $val,
+            );
+        }
+    };
 }

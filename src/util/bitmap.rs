@@ -6,14 +6,23 @@ pub struct Bitmap {
     size_bytes: usize,
 }
 
+#[repr(C)]
+#[repr(align(0x1000))]
+pub struct BMSpace(pub [u8; PAGE_SIZE]);
+
+impl BMSpace {
+    pub fn base(&self) -> Vaddr {
+        &self.0[0] as *const _ as _
+    }
+}
+
 impl Bitmap {
     pub fn new(base: Vaddr, size_bytes: usize) -> Self {
         assert!(is_aligned(base as usize, PAGE_SIZE));
-        assert!(is_aligned(size_bytes as usize, PAGE_SIZE));
         Self { base, size_bytes }
     }
 
-    pub fn clear_all(&self) {
+    pub fn clear_all(&mut self) {
         let ptr = self.base as *mut u8;
         unsafe {
             core::ptr::write_bytes(ptr, 0, self.size_bytes);
@@ -31,7 +40,7 @@ impl Bitmap {
         ((byte >> bit_index) & 1) == 1
     }
 
-    pub fn set(&self, index: usize) {
+    pub fn set(&mut self, index: usize) {
         assert!(index < self.size_bytes * 8); // make sure index is in bounds
 
         let byte_index = index / 8;
@@ -41,7 +50,7 @@ impl Bitmap {
         unsafe { *byte_ptr |= 1 << bit_index }
     }
 
-    pub fn clear(&self, index: usize) {
+    pub fn clear(&mut self, index: usize) {
         assert!(index < self.size_bytes * 8); // make sure index is in bounds
 
         let byte_index = index / 8;
@@ -70,13 +79,13 @@ impl Bitmap {
         count
     }
 
-    pub fn clear_consecutive(&self, start: usize, n: usize) {
+    pub fn clear_consecutive(&mut self, start: usize, n: usize) {
         for i in 0..n {
             self.clear(start + i);
         }
     }
 
-    pub fn set_consecutive(&self, start: usize, n: usize) {
+    pub fn set_consecutive(&mut self, start: usize, n: usize) {
         for i in 0..n {
             self.set(start + i);
         }

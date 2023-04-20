@@ -108,7 +108,7 @@ impl MemPagePool {
             PTE_HYP_FLAGS,
         )?;
         self.bitmap = Some(Bitmap::new(root_bitmap, bitmap_num_pages * PAGE_SIZE));
-        self.bitmap.as_ref().unwrap().clear_all();
+        self.bitmap.as_mut().unwrap().clear_all();
         if !self.reserve_ppages(&bitmap_pp) {
             return Err(BaoError::AlreadyExists);
         }
@@ -130,7 +130,7 @@ impl MemPagePool {
         let was_free = !self.are_ppages_reserved(ppages);
         if was_free {
             self.bitmap
-                .as_ref()
+                .as_mut()
                 .unwrap()
                 .set_consecutive(pageoff, ppages.num_pages);
             self.free -= ppages.num_pages;
