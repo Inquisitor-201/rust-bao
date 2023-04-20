@@ -1,9 +1,9 @@
 pub mod armv8_a;
 pub mod cpu;
 pub mod defs;
+pub mod gic;
 pub mod intr;
 pub mod platform;
-pub mod gic;
 
 #[macro_use]
 pub mod sysregs;

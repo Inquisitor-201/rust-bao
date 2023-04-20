@@ -6,7 +6,7 @@ use core::arch::asm;
 use aarch64::regs::PAR_EL1;
 use tock_registers::interfaces::Readable;
 
-use crate::{baocore::types::Vaddr, arch::aarch64::armv8_a::fences::isb};
+use crate::{arch::aarch64::armv8_a::fences::isb, baocore::types::Vaddr};
 
 // TCR - Translation Control Register
 pub const TCR_RES1: u64 = (1 << 23) | (1 << 31);

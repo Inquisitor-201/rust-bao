@@ -1,11 +1,11 @@
 pub mod cache;
 pub mod cpu;
 pub mod heap;
+pub mod intr;
 pub mod mem;
 pub mod mmu;
 pub mod pagetable;
 pub mod types;
-pub mod intr;
 
 #[macro_use]
 pub mod console;

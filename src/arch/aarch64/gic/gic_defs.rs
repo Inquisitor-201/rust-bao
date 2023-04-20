@@ -58,4 +58,3 @@ pub const GICH_VTR_LEN: u32 = 6;
 pub const GICH_VTR_MSK: u32 = ((1 << GICH_VTR_LEN) - 1) << GICH_VTR_OFF;
 pub const GICH_HCR_LRENPIE_BIT: u32 = 1 << 2;
 // gicc...........
-
