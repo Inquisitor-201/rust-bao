@@ -6,7 +6,7 @@ use super::{
     cpu::{mem_cpu_boot_alloc_size, mycpu, CPU_SYNC_TOKEN},
     heap,
     mmu::{mem::mem_prot_init, sections::SEC_HYP_GLOBAL},
-    types::{ColorMap, Paddr},
+    types::{ColorMap, Paddr, AsSecID},
 };
 use crate::{
     arch::aarch64::{armv8_a::pagetable::PTE_HYP_FLAGS, defs::PAGE_SIZE},
@@ -64,6 +64,15 @@ pub fn mem_alloc_ppages(num_pages: usize, aligned: bool) -> Option<PPages> {
         };
     }
     None
+}
+
+pub fn mem_alloc_page(num_pages: usize, sec: AsSecID, phys_aligned: bool) -> Result<u64, BaoError> {
+    if let Some(ppages) = mem_alloc_ppages(num_pages, phys_aligned) {
+        if ppages.num_pages == num_pages {
+            return mycpu().addr_space.mem_alloc_map(sec, Some(&ppages), None, num_pages, PTE_HYP_FLAGS);
+        }
+    }
+    Err(BaoError::OutOfMemory)
 }
 
 #[repr(C)]

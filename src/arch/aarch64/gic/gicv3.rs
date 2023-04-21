@@ -144,10 +144,10 @@ impl GicV3 {
             gich_write_lr(i, 0);
         }
         write_reg!(icc_pmr_el1, GIC_LOWEST_PRIO);
-        write_reg!(icc_bpr1_el1, 0x0);
-        write_reg!(icc_ctlr_el1, ICC_CTLR_EOIMode_BIT);
+        write_reg!(icc_bpr1_el1, 0u64);
+        write_reg!(icc_ctlr_el1, ICC_CTLR_EOIMode_BIT as u64);
         let hcr = read_reg!(ich_hcr_el2) as u32 | GICH_HCR_LRENPIE_BIT;
-        write_reg!(ich_hcr_el2, hcr);
+        write_reg!(ich_hcr_el2, hcr as u64);
         write_reg!(icc_igrpen1_el1, ICC_IGRPEN_EL1_ENB_BIT);
     }
 }

@@ -1,27 +1,28 @@
 use alloc::vec;
-use spin::{Lazy, Mutex};
+use spin::{Lazy, RwLock};
 
 use crate::{
     baocore::vm::{VMDeviceRegion, VMMemRegion, VMPlatform},
     config::{Config, VMConfig},
-    def_vm_image, arch::aarch64::armv8_a::vm::{ArchVMPlatform, VGicDscr},
+    def_vm_image, arch::aarch64::armv8_a::vm::{ArchVMPlatform, VGicDscr}, println,
 };
 
-def_vm_image!("linux_image", "linux.bin");
-def_vm_image!("freertos_image", "freertos.bin");
+def_vm_image!("linux", "imgs/qemu-aarch64-virt/linux.bin");
+def_vm_image!("freertos", "imgs/qemu-aarch64-virt/freertos.bin");
 
-pub static CONFIG: Lazy<Mutex<Config>> = Lazy::new(|| {
+pub static CONFIG: Lazy<RwLock<Config>> = Lazy::new(|| {
     extern "C" {
         fn _linux_vm_begin();
         fn _freertos_vm_begin();
-        static _linux_vm_size: usize;
-        static _freertos_vm_size: usize;
+        fn _linux_vm_size();
+        fn _freertos_vm_size();
     }
 
+    println!("_linux_vm_begin = {:#x?}, _linux_vm_size = {:#x?}", _linux_vm_begin as u64, _linux_vm_size as u64);
     let vm_config_linux = VMConfig {
         base_addr: 0x60000000,
         load_addr: _linux_vm_begin as u64,
-        size: unsafe { _linux_vm_size },
+        size: _linux_vm_size as _,
         separately_loaded: false,
         inplace: false,
         entry: 0x60000000,
@@ -58,7 +59,7 @@ pub static CONFIG: Lazy<Mutex<Config>> = Lazy::new(|| {
         },
     };
 
-    Mutex::new(Config {
+    RwLock::new(Config {
         shared_mem: None,
         vmlist: vec![vm_config_linux],
     })
