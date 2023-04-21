@@ -99,7 +99,7 @@ pub fn init() {
     let (master, vm_id) = vmm_assign_vcpu();
     match vm_id {
         Some(vm_id) => {
-            let vm_alloc = vmm_alloc_install_vm(vm_id, master);
+            let _vm_alloc = vmm_alloc_install_vm(vm_id, master);
         }
         _ => todo!("cpu_idle"),
     }

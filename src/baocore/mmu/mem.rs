@@ -20,7 +20,7 @@ use crate::{
         pagetable::{root_pt_addr, Pagetable},
         types::{AsSecID, AsType, Asid, ColorMap, MemFlags, Paddr, Vaddr, MAX_VA},
     },
-    util::{is_aligned, num_pages, BaoError, BaoResult}, println,
+    util::{is_aligned, num_pages, BaoError, BaoResult},
 };
 
 use super::sections::mem_get_sections;
