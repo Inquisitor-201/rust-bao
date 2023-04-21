@@ -23,6 +23,7 @@ pub struct VMPlatform {
     pub arch: ArchVMPlatform,
 }
 
+#[derive(Clone, Copy)]
 pub struct VMAllocation {
     pub base: Vaddr,
     pub size: usize,

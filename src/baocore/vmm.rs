@@ -73,10 +73,9 @@ fn vmm_alloc_vm(config: &VMConfig) -> VMAllocation {
     }
 }
 
-fn vmm_alloc_install_vm(vm_id: usize, master: bool) {
+fn vmm_alloc_install_vm(vm_id: usize, master: bool) -> VMAllocation {
     let config = CONFIG.read();
     let vm_assign = &VM_ASSIGN[vm_id as usize];
-    // let vm_alloc = &mut vm_assign.vm_alloc;
     let vm_config = &config.vmlist[vm_id as usize];
 
     if master {
@@ -85,11 +84,12 @@ fn vmm_alloc_install_vm(vm_id: usize, master: bool) {
         let mut _lock = vm_assign.write();
         _lock.vm_alloc = Some(allocation);
         _lock.vm_install_info = Some(install_info);
+        allocation
     } else {
         while vm_assign.read().vm_install_info.is_none() {}
         vmm_vm_install(vm_assign.read().vm_install_info.as_ref().unwrap());
+        vm_assign.read().vm_alloc.unwrap()
     }
-    // vm_alloc
 }
 
 pub fn init() {
@@ -99,7 +99,7 @@ pub fn init() {
     let (master, vm_id) = vmm_assign_vcpu();
     match vm_id {
         Some(vm_id) => {
-            vmm_alloc_install_vm(vm_id, master);
+            let vm_alloc = vmm_alloc_install_vm(vm_id, master);
         }
         _ => todo!("cpu_idle"),
     }
