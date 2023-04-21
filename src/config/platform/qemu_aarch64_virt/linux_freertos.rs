@@ -12,16 +12,16 @@ def_vm_image!("freertos", "imgs/qemu-aarch64-virt/freertos.bin");
 
 pub static CONFIG: Lazy<RwLock<Config>> = Lazy::new(|| {
     extern "C" {
-        fn _linux_vm_begin();
-        fn _freertos_vm_begin();
+        fn _linux_vm_beg();
+        fn _freertos_vm_beg();
         fn _linux_vm_size();
         fn _freertos_vm_size();
     }
 
-    println!("_linux_vm_begin = {:#x?}, _linux_vm_size = {:#x?}", _linux_vm_begin as u64, _linux_vm_size as u64);
+    println!("_linux_vm_begin = {:#x?}, _linux_vm_size = {:#x?}", _linux_vm_beg as u64, _linux_vm_size as u64);
     let vm_config_linux = VMConfig {
         base_addr: 0x60000000,
-        load_addr: _linux_vm_begin as u64,
+        load_addr: _linux_vm_beg as u64,
         size: _linux_vm_size as _,
         separately_loaded: false,
         inplace: false,
