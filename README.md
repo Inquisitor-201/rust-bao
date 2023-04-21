@@ -11,3 +11,5 @@ todo:
 10. todo: activate maintanence intr & IPI_CPU_MSG
 11. todo: cmmu init
 12. todo: ipc init
+
+rust-lld -> gnu ld

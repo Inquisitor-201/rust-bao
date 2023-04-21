@@ -17,7 +17,7 @@ use crate::{
     },
 };
 
-pub const MAX_PAGE_POOLS: usize = 8;
+pub const MAX_PAGE_POOLS: usize = 4;
 
 pub struct PagePools {
     pools: [Option<&'static mut MemPagePool>; MAX_PAGE_POOLS],

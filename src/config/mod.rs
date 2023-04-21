@@ -13,19 +13,10 @@ macro_rules! def_vm_image {
         core::arch::global_asm!(
             concat!(".pushsection .vm_image_", $img_name, ", \"a\"",),
             concat!(".global _", $img_name, "_vm_beg"),
+            concat!(".global _", $img_name, "_vm_end"),
             concat!("_", $img_name, "_vm_beg:"),
             concat!(".incbin \"", $img_path, "\""),
             concat!("_", $img_name, "_vm_end:"),
-            concat!(".global _", $img_name, "_vm_size"),
-            concat!(
-                ".set _",
-                $img_name,
-                "_vm_size,  (_",
-                $img_name,
-                "_vm_end - _",
-                $img_name,
-                "_vm_beg)"
-            ),
             ".popsection"
         );
     };

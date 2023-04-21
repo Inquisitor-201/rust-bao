@@ -5,8 +5,11 @@ use tock_registers::interfaces::{Readable, Writeable};
 use crate::{
     arch::aarch64::{
         armv8_a::{
-            fences::fence_sync,
-            pagetable::{PageTableArch, HYP_PT_DSCR, PTE, PTE_HYP_FLAGS, PTE_RSW_RSRV, VM_PT_DSCR},
+            fences::{fence_sync, fence_sync_write},
+            pagetable::{
+                PageTableArch, HYP_PT_DSCR, PTE, PTE_HYP_FLAGS, PTE_INVALID, PTE_RSW_MSK,
+                PTE_RSW_RSRV, PTE_TABLE, VM_PT_DSCR,
+            },
         },
         defs::PAGE_SIZE,
         sysregs::{arm_at_s12e1w, arm_at_s1e2w, PAR_F, PAR_PA_MSK},
@@ -17,7 +20,7 @@ use crate::{
         pagetable::{root_pt_addr, Pagetable},
         types::{AsSecID, AsType, Asid, ColorMap, MemFlags, Paddr, Vaddr, MAX_VA},
     },
-    util::{is_aligned, BaoError, BaoResult},
+    util::{is_aligned, num_pages, BaoError, BaoResult}, println,
 };
 
 use super::sections::mem_get_sections;
@@ -145,11 +148,11 @@ impl AddrSpace {
                         }
                         count += lvlsz / PAGE_SIZE;
                     } else {
-                        todo!("mem alloc page");
+                        self.alloc_pt_and_set(lvl, pte_ptr, addr);
                     }
                 }
 
-                if pte.is_table(&self.pt, lvl) {
+                if unsafe { *pte_ptr }.is_table(&self.pt, lvl) {
                     lvl += 1;
                     break;
                 } else {
@@ -313,6 +316,27 @@ impl AddrSpace {
             None
         } else {
             Some((par & PAR_PA_MSK) | (va & (PAGE_SIZE as u64 - 1)))
+        }
+    }
+
+    pub fn alloc_pt_and_set(&self, lvl: usize, pte_ptr: *mut PTE, vaddr: Vaddr) {
+        let pt_size = num_pages(self.pt.pt_size(lvl + 1));
+        if pt_size > 1 {
+            unimplemented!("alloc_pt_and_set: pt is too big")
+        }
+        match mem_alloc_ppages(pt_size, false) {
+            Some(ppages) => {
+                let pte_dflt_val = PTE_INVALID | (unsafe { *pte_ptr }.0 & PTE_RSW_MSK);
+                unsafe { *pte_ptr = PTE::new(ppages.base, PTE_TABLE, PTE_HYP_FLAGS) }
+                fence_sync_write();
+                let temp_pt = self.pt.pt_get_pte(lvl + 1, vaddr);
+                for i in 0..self.pt.pt_nentries(lvl + 1) {
+                    unsafe {
+                        (*temp_pt.add(i)).0 = pte_dflt_val;
+                    }
+                }
+            }
+            None => panic!("alloc_pt_and_set: no free mem"),
         }
     }
 }

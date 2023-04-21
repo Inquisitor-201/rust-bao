@@ -14,15 +14,16 @@ pub static CONFIG: Lazy<RwLock<Config>> = Lazy::new(|| {
     extern "C" {
         fn _linux_vm_beg();
         fn _freertos_vm_beg();
-        fn _linux_vm_size();
-        fn _freertos_vm_size();
+        fn _linux_vm_end();
+        fn _freertos_vm_end();
     }
 
-    println!("_linux_vm_begin = {:#x?}, _linux_vm_size = {:#x?}", _linux_vm_beg as u64, _linux_vm_size as u64);
+    println!("_linux_vm_begin = {:#x?}, _linux_vm_end = {:#x?}", _linux_vm_beg as u64, _linux_vm_end as u64);
+
     let vm_config_linux = VMConfig {
         base_addr: 0x60000000,
         load_addr: _linux_vm_beg as u64,
-        size: _linux_vm_size as _,
+        size: (_linux_vm_end as usize - _linux_vm_beg as usize),
         separately_loaded: false,
         inplace: false,
         entry: 0x60000000,

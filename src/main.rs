@@ -15,11 +15,14 @@ pub mod config;
 
 use core::panic::PanicInfo;
 
+use crate::baocore::cpu::mycpu;
+
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
     if let Some(location) = info.location() {
         println!(
-            "Panicked at {}:{} {}",
+            "[Cpu {}] Panicked at {}:{} {}",
+            mycpu().id,
             location.file(),
             location.line(),
             info.message().unwrap()

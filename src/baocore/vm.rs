@@ -36,4 +36,6 @@ pub struct VMInstallInfo {
 
 pub struct VM {}
 
-pub struct VCpu {}
+pub struct VCpu {
+    pub aaa: usize
+}

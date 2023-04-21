@@ -2,6 +2,7 @@
 target = "aarch64-unknown-none"
 
 [target.aarch64-unknown-none]
+linker = "aarch64-none-elf-ld"
 rustflags = [
     "-Clink-arg=-Tsrc/linker_mmu.ld",
     "-Cforce-frame-pointers=yes",

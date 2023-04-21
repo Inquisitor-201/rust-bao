@@ -86,7 +86,7 @@ fn vmm_alloc_install_vm(vm_id: usize, master: bool) {
         _lock.vm_alloc = Some(allocation);
         _lock.vm_install_info = Some(install_info);
     } else {
-        while !vm_assign.read().vm_install_info.is_none() {}
+        while vm_assign.read().vm_install_info.is_none() {}
         vmm_vm_install(vm_assign.read().vm_install_info.as_ref().unwrap());
     }
     // vm_alloc
