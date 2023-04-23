@@ -20,7 +20,7 @@ use crate::{
         pagetable::{root_pt_addr, Pagetable},
         types::{AsSecID, AsType, Asid, ColorMap, MemFlags, Paddr, Vaddr, MAX_VA},
     },
-    util::{clear_memory, is_aligned, num_pages, BaoError, BaoResult},
+    util::{clear_memory, is_aligned, num_pages, BaoError, BaoResult}, println,
 };
 
 use super::sections::{mem_get_sections, SEC_HYP_PRIVATE, SEC_HYP_VM};
@@ -65,7 +65,7 @@ impl AddrSpace {
                     AsType::AsVM => SEC_HYP_VM,
                     _ => SEC_HYP_PRIVATE,
                 },
-                false,
+                true,
             )
             .unwrap();
             clear_memory(root, n * PAGE_SIZE);
@@ -169,6 +169,7 @@ impl AddrSpace {
                             vpage = Some(addr);
                         }
                         count += lvlsz / PAGE_SIZE;
+                        println!("{:#x?}/{:#x?}", count, addr);
                     } else {
                         self.alloc_pt_and_set(lvl, pte_ptr, addr);
                     }
@@ -183,7 +184,7 @@ impl AddrSpace {
                     }
                     entry += 1;
                     addr += lvlsz as u64;
-                    if entry > nentries {
+                    if entry >= nentries {
                         lvl = 0;
                         break;
                     }
@@ -224,7 +225,7 @@ impl AddrSpace {
     ) -> BaoResult<Vaddr> {
         assert!(is_aligned(va as usize, PAGE_SIZE));
         let mut count = 0;
-        let mut pte = None;
+        let mut pte_ptr = None;
         let mut vaddr = va;
 
         let sec = self.mem_find_sec(vaddr);
@@ -250,13 +251,13 @@ impl AddrSpace {
         while count < num_pages {
             let mut lvl = 0;
             for _ in 0..self.pt.dscr.lvls {
-                pte = Some(self.pt.pt_get_pte(lvl, vaddr));
+                pte_ptr = Some(self.pt.pt_get_pte(lvl, vaddr));
                 if self.pt.dscr.lvl_term[lvl] {
-                    let pte = unsafe { *pte.unwrap() };
+                    let pte = unsafe { *pte_ptr.unwrap() };
                     if pte.is_mappable(&self.pt, lvl, num_pages - count, vaddr, paddr) {
                         break;
                     } else if !pte.is_valid() {
-                        todo!("mem alloc page");
+                        self.alloc_pt_and_set(lvl, pte_ptr.unwrap(), vaddr);
                         // self.mem_alloc_pt(pte, lvl, vaddr);
                     } else if !pte.is_table(&self.pt, lvl) {
                         panic!("trying to override previous mapping");
@@ -265,13 +266,13 @@ impl AddrSpace {
                 lvl += 1;
             }
 
-            let entry = self.pt.pt_getpteindex(pte.unwrap(), lvl);
+            let mut entry = self.pt.pt_getpteindex(pte_ptr.unwrap(), lvl);
             let nentries = self.pt.pt_nentries(lvl);
             let lvlsz = self.pt.pt_lvlsize(lvl);
 
             while entry < nentries && count < num_pages && num_pages - count >= lvlsz / PAGE_SIZE {
                 if ppages.is_none() {
-                    match mem_alloc_ppages(lvlsz / PAGE_SIZE, false) {
+                    match mem_alloc_ppages(lvlsz / PAGE_SIZE, true) {
                         Some(ppages) => {
                             paddr = ppages.base;
                         }
@@ -279,12 +280,13 @@ impl AddrSpace {
                     }
                 }
                 unsafe {
-                    *(pte.unwrap()) = PTE::new(paddr, self.pt.page_type(lvl), flags);
+                    *(pte_ptr.unwrap()) = PTE::new(paddr, self.pt.page_type(lvl), flags);
                 }
                 vaddr += lvlsz as u64;
                 paddr += lvlsz as u64;
                 count += lvlsz / PAGE_SIZE;
-                pte = Some(unsafe { pte.unwrap().add(1) });
+                entry += 1;
+                pte_ptr = Some(unsafe { pte_ptr.unwrap().add(1) });
             }
         }
 
@@ -300,8 +302,14 @@ impl AddrSpace {
         num_pages: usize,
         flags: MemFlags,
     ) -> BaoResult<Vaddr> {
+        println!("[{}]mem_alloc_start", mycpu().id);
         match self.mem_alloc_vpage(section, at, num_pages) {
-            Some(va) => self.mem_map(va, ppages, num_pages, flags),
+            Some(va) =>  {
+                println!("[{}]mem_alloc_map {:#x?}", mycpu().id, va);
+                let r = self.mem_map(va, ppages, num_pages, flags);
+                println!("[{}]mem_map done {:#x?}", mycpu().id, va);
+                r
+            }
             _ => Err(BaoError::NotFound),
         }
     }

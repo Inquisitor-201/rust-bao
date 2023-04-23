@@ -16,5 +16,5 @@ todo:
 15. todo: tlb disable?
 16. todo: copy vm-image: cache_flush_range
 17. todo: mem_unmap
-
+18. vmm_arch_profile_init: parange??
 rust-lld -> gnu ld

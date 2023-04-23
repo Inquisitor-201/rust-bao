@@ -104,7 +104,6 @@ impl VM {
 
     fn calc_vcpu_id(&self) -> VCpuID {
         let mut vcpu_id = 0;
-        println!("self.cpus = {}", self.cpus);
         for i in 0..mycpu().id {
             if self.cpus & (1 << i) != 0 {
                 vcpu_id += 1;
@@ -144,7 +143,6 @@ impl VM {
 
         vcpu.arch_init(self);
         vcpu.arch_reset(config.entry);
-        println!("vcpu_init done");
     }
 
     fn init_mem_regions(&mut self, config: &VMConfig) {
@@ -175,6 +173,7 @@ impl VM {
 
     fn copy_img_to_rgn(&mut self, config: &VMConfig, reg: &VMMemRegion) {
         // Map original image address
+        println!("[{}]copy_img_to_rgn", mycpu().id);
         let n_img = num_pages(config.size);
         let src_pa_img = PPages::new(config.load_addr, n_img);
         let src_va = mycpu()
@@ -187,7 +186,6 @@ impl VM {
                 PTE_HYP_FLAGS,
             )
             .unwrap();
-
         // Map new address
         let offset = config.base_addr - reg.base;
         let dst_phys = reg.phys + offset;
@@ -196,7 +194,6 @@ impl VM {
             .addr_space
             .mem_alloc_map(SEC_HYP_PRIVATE, Some(&dst_pp), None, n_img, PTE_HYP_FLAGS)
             .unwrap();
-
         unsafe {
             core::ptr::copy_nonoverlapping(
                 dst_va as *const u8,
@@ -210,6 +207,7 @@ impl VM {
     }
 
     fn map_mem_region(&mut self, reg: &VMMemRegion) {
+        println!("start map_mem_region");
         let n = num_pages(reg.size);
 
         let ppages = if reg.place_phys {
@@ -219,6 +217,7 @@ impl VM {
             None
         };
 
+        println!("ppa = {:#x?}", ppages);
         let va = self
             .addr_space
             .mem_alloc_map(SEC_VM_ANY, ppages.as_ref(), Some(reg.base), n, PTE_VM_FLAGS)

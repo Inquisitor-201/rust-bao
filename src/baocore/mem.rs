@@ -13,8 +13,8 @@ use crate::{
     config,
     platform::PLATFORM,
     util::{
-        bitmap::Bitmap, image_load_size, image_noload_size, image_size, num_pages, range_in_range,
-        vm_image_size, BaoError, BaoResult,
+        align, bitmap::Bitmap, image_load_size, image_noload_size, image_size, num_pages,
+        range_in_range, vm_image_size, BaoError, BaoResult, is_aligned,
     },
 };
 
@@ -83,6 +83,7 @@ pub fn mem_alloc_page(num_pages: usize, sec: AsSecID, phys_aligned: bool) -> Res
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct PPages {
     pub base: Paddr,
     pub num_pages: usize,
@@ -206,7 +207,6 @@ impl MemPagePool {
     }
 
     pub fn alloc(&mut self, num_pages: usize, aligned: bool) -> Option<PPages> {
-        assert!(!aligned);
         if self.free < num_pages {
             return None;
         }
@@ -215,18 +215,33 @@ impl MemPagePool {
         }
         let _lock = self.lock.lock();
 
-        let mut curr = self.last;
+        let base = self.base as usize / PAGE_SIZE % num_pages;
+        let mut curr = if aligned {
+            align(base + self.last, num_pages) - base
+        } else {
+            self.last
+        };
+
         let bitmap = self.bitmap.as_mut().unwrap();
         for _ in 0..2 {
-            match bitmap.find_consec(curr, num_pages, false) {
-                Some(bit) => {
-                    let p = PPages::new(self.base + (bit * PAGE_SIZE) as u64, num_pages);
-                    bitmap.set_consecutive(bit, num_pages);
-                    self.free -= num_pages;
-                    self.last = bit + num_pages;
-                    return Some(p);
+            loop {
+                match bitmap.find_consec(curr, num_pages, false) {
+                    Some(bit) => {
+                        if aligned && !is_aligned(base + bit, num_pages){
+                            curr = align(base + bit, num_pages) - base;
+                            continue;
+                        }
+                        let p = PPages::new(self.base + (bit * PAGE_SIZE) as u64, num_pages);
+                        bitmap.set_consecutive(bit, num_pages);
+                        self.free -= num_pages;
+                        self.last = bit + num_pages;
+                        return Some(p);
+                    }
+                    None =>  {
+                        curr = 0;
+                        break;
+                    }
                 }
-                None => curr = 0,
             }
         }
         None

@@ -31,9 +31,10 @@ impl Pagetable {
         unsafe { *pte = PTE::new(root_pt_pa, PTE_TABLE, PTE_HYP_FLAGS) };
         self.arch.rec_index = index;
         self.arch.rec_mask = 0;
+        let cpu_rec_index = mycpu().addr_space.pt.arch.rec_index;
         for i in 0..self.dscr.lvls {
             let lvl_off = self.dscr.lvl_off[i];
-            self.arch.rec_mask |= (index as u64) << lvl_off;
+            self.arch.rec_mask |= (cpu_rec_index as u64) << lvl_off;
         }
     }
 
