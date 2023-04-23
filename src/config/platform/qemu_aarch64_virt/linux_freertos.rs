@@ -2,9 +2,10 @@ use alloc::vec;
 use spin::{Lazy, RwLock};
 
 use crate::{
+    arch::aarch64::armv8_a::vm::{ArchVMPlatform, VGicDscr},
     baocore::vm::{VMDeviceRegion, VMMemRegion, VMPlatform},
     config::{Config, VMConfig},
-    def_vm_image, arch::aarch64::armv8_a::vm::{ArchVMPlatform, VGicDscr}, println,
+    def_vm_image, println,
 };
 
 def_vm_image!("linux", "imgs/qemu-aarch64-virt/linux.bin");
@@ -18,7 +19,10 @@ pub static CONFIG: Lazy<RwLock<Config>> = Lazy::new(|| {
         fn _freertos_vm_end();
     }
 
-    println!("_linux_vm_begin = {:#x?}, _linux_vm_end = {:#x?}", _linux_vm_beg as u64, _linux_vm_end as u64);
+    println!(
+        "_linux_vm_begin = {:#x?}, _linux_vm_end = {:#x?}",
+        _linux_vm_beg as u64, _linux_vm_end as u64
+    );
 
     let vm_config_linux = VMConfig {
         base_addr: 0x60000000,
@@ -32,6 +36,8 @@ pub static CONFIG: Lazy<RwLock<Config>> = Lazy::new(|| {
             vm_regions: vec![VMMemRegion {
                 base: 0x60000000,
                 size: 0x40000000,
+                place_phys: true,
+                phys: 0x60000000,
             }],
             devs: vec![
                 VMDeviceRegion {
@@ -56,7 +62,7 @@ pub static CONFIG: Lazy<RwLock<Config>> = Lazy::new(|| {
                     gicr_addr: 0,
                     interrupt_num: 0,
                 },
-            }
+            },
         },
     };
 

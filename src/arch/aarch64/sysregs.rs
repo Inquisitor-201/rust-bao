@@ -8,6 +8,47 @@ use tock_registers::interfaces::Readable;
 
 use crate::{arch::aarch64::armv8_a::fences::isb, baocore::types::Vaddr};
 
+// SPSR - Saved Program Status Register
+pub const SPSR_EL_MSK: u64 = 0x0f;
+pub const SPSR_EL0t: u64 = 0x0;
+pub const SPSR_EL1t: u64 = 0x4;
+pub const SPSR_EL1h: u64 = 0x5;
+pub const SPSR_EL2t: u64 = 0x8;
+pub const SPSR_EL2h: u64 = 0x9;
+pub const SPSR_EL3t: u64 = 0xc;
+pub const SPSR_EL3h: u64 = 0xd;
+
+pub const SPSR_F: u64 = 1 << 6;
+pub const SPSR_I: u64 = 1 << 7;
+pub const SPSR_A: u64 = 1 << 8;
+pub const SPSR_D: u64 = 1 << 9;
+pub const SPSR_IL: u64 = 1 << 20;
+pub const SPSR_SS: u64 = 1 << 21;
+
+pub const SPSR_USR: u64 = 0x10;
+pub const SPSR_IRQ: u64 = 0x12;
+pub const SPSR_SVC: u64 = 0x13;
+pub const SPSR_ABT: u64 = 0x17;
+pub const SPSR_UND: u64 = 0x1b;
+pub const SPSR_SYS: u64 = 0x1f;
+
+// SCR - Secure Configuration Register
+pub const SCR_NS: u64 = 1 << 0;
+pub const SCR_IRQ: u64 = 1 << 1;
+pub const SCR_FIQ: u64 = 1 << 2;
+pub const SCR_EA: u64 = 1 << 3;
+pub const SCR_SMD: u64 = 1 << 7;
+pub const SCR_HCE: u64 = 1 << 8;
+pub const SCR_SIF: u64 = 1 << 9;
+pub const SCR_RW: u64 = 1 << 10;
+pub const SCR_ST: u64 = 1 << 11;
+pub const SCR_TWI: u64 = 1 << 12;
+pub const SCR_TWE: u64 = 1 << 13;
+pub const SCR_TLOR: u64 = 1 << 14;
+pub const SCR_TERR: u64 = 1 << 15;
+pub const SCR_APK: u64 = 1 << 16;
+pub const SCR_API: u64 = 1 << 17;
+
 // TCR - Translation Control Register
 pub const TCR_RES1: u64 = (1 << 23) | (1 << 31);
 pub const TCR_T0SZ_MSK: u64 = 0x1f << 0;

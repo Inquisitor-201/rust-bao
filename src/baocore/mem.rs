@@ -6,10 +6,11 @@ use super::{
     cpu::{mem_cpu_boot_alloc_size, mycpu, CPU_SYNC_TOKEN},
     heap,
     mmu::{mem::mem_prot_init, sections::SEC_HYP_GLOBAL},
-    types::{ColorMap, Paddr, AsSecID},
+    types::{AsSecID, ColorMap, Paddr},
 };
 use crate::{
     arch::aarch64::{armv8_a::pagetable::PTE_HYP_FLAGS, defs::PAGE_SIZE},
+    config,
     platform::PLATFORM,
     util::{
         bitmap::Bitmap, image_load_size, image_noload_size, image_size, num_pages, range_in_range,
@@ -69,7 +70,13 @@ pub fn mem_alloc_ppages(num_pages: usize, aligned: bool) -> Option<PPages> {
 pub fn mem_alloc_page(num_pages: usize, sec: AsSecID, phys_aligned: bool) -> Result<u64, BaoError> {
     if let Some(ppages) = mem_alloc_ppages(num_pages, phys_aligned) {
         if ppages.num_pages == num_pages {
-            return mycpu().addr_space.mem_alloc_map(sec, Some(&ppages), None, num_pages, PTE_HYP_FLAGS);
+            return mycpu().addr_space.mem_alloc_map(
+                sec,
+                Some(&ppages),
+                None,
+                num_pages,
+                PTE_HYP_FLAGS,
+            );
         }
     }
     Err(BaoError::OutOfMemory)
@@ -297,6 +304,7 @@ pub fn init(load_addr: Paddr) {
         };
         add_page_pool(&mut mem_region.page_pool);
         heap::init();
+        config::init(load_addr);
     }
     CPU_SYNC_TOKEN.sync_and_clear_msg();
 }

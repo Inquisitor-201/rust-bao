@@ -1,6 +1,8 @@
 pub mod bitmap;
 
-use crate::arch::aarch64::defs::PAGE_SIZE;
+use core::slice::from_raw_parts_mut;
+
+use crate::{arch::aarch64::defs::PAGE_SIZE, baocore::types::Vaddr};
 
 #[inline]
 pub fn range_in_range(base1: usize, size1: usize, base2: usize, size2: usize) -> bool {
@@ -64,6 +66,12 @@ pub fn align_floor(val: usize, to: usize) -> usize {
 
 pub fn num_pages(sz: usize) -> usize {
     sz.div_ceil(PAGE_SIZE)
+}
+
+pub fn clear_memory(va: Vaddr, sz: usize) {
+    unsafe {
+        from_raw_parts_mut(va as _, sz).fill(0);
+    }
 }
 
 pub const PAGE_OFFSET_MASK: usize = PAGE_SIZE - 1;

@@ -3,8 +3,8 @@ pub mod mem;
 #[macro_use]
 pub mod pagetable;
 pub mod fences;
-pub mod vmm;
 pub mod vm;
+pub mod vmm;
 
 use super::{defs::*, sysregs::*};
 use crate::baocore::cpu::CPU_SIZE;

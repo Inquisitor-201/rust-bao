@@ -1,4 +1,5 @@
 #![allow(unused)]
+#![allow(non_upper_case_globals)]
 
 use core::mem::size_of;
 
@@ -25,12 +26,14 @@ pub const fn pte_attr(n: u64) -> u64 {
 pub const PTE_ADDR_MSK: u64 = addr_msk(47, 12);
 pub const PTE_FLAGS_MSK: u64 = !PTE_ADDR_MSK;
 pub const PTE_ATTR_OFF: u64 = 2;
-pub const PTE_ATTR_MSK: u64 = 0x7u64 << PTE_ATTR_OFF;
+pub const PTE_ATTR_MSK: u64 = 0x7 << PTE_ATTR_OFF;
 pub const PTE_AP_OFF: u64 = 6;
-pub const PTE_AP_RW: u64 = 0x1u64 << PTE_AP_OFF;
+pub const PTE_AP_RW: u64 = 0x1 << PTE_AP_OFF;
 pub const PTE_SH_OFF: u64 = 8;
-pub const PTE_SH_IS: u64 = 0x3u64 << PTE_SH_OFF;
-pub const PTE_AF: u64 = 1u64 << 10;
+pub const PTE_SH_NS: u64 = 0x0 << PTE_SH_OFF;
+pub const PTE_SH_OS: u64 = 0x2 << PTE_SH_OFF;
+pub const PTE_SH_IS: u64 = 0x3 << PTE_SH_OFF;
+pub const PTE_AF: u64 = 1 << 10;
 pub const PTE_TABLE: u64 = 3;
 pub const PTE_PAGE: u64 = 3;
 pub const PTE_TYPE_MSK: u64 = 0x3;
@@ -39,8 +42,26 @@ pub const PTE_XN: u64 = 1 << 54;
 pub const PTE_INVALID: u64 = 0;
 pub const PTE_VALID: u64 = 0x1;
 pub const PTE_SUPERPAGE: u64 = 0x1;
+/* Stage 2 fields */
+const PTE_MEMATTR_OFF: u64 = 2;
+const PTE_MEMATTR_DEV_nGnRnE: u64 = (0x00 << 0) << PTE_MEMATTR_OFF;
+const PTE_MEMATTR_DEV_nGnRE: u64 = (0x01 << 0) << PTE_MEMATTR_OFF;
+const PTE_MEMATTR_DEV_nGRE: u64 = (0x02 << 0) << PTE_MEMATTR_OFF;
+const PTE_MEMATTR_DEV_GRE: u64 = (0x03 << 0) << PTE_MEMATTR_OFF;
+const PTE_MEMATTR_NRML_ONC: u64 = (0x01 << 2) << PTE_MEMATTR_OFF;
+const PTE_MEMATTR_NRML_OWTC: u64 = (0x02 << 2) << PTE_MEMATTR_OFF;
+const PTE_MEMATTR_NRML_OWBC: u64 = (0x03 << 2) << PTE_MEMATTR_OFF;
+const PTE_MEMATTR_NRML_INC: u64 = (0x01 << 0) << PTE_MEMATTR_OFF;
+const PTE_MEMATTR_NRML_IWTC: u64 = (0x02 << 0) << PTE_MEMATTR_OFF;
+const PTE_MEMATTR_NRML_IWBC: u64 = (0x03 << 0) << PTE_MEMATTR_OFF;
+
+const PTE_S2AP_RO: u64 = (0x1 << PTE_AP_OFF);
+const PTE_S2AP_WO: u64 = (0x2 << PTE_AP_OFF);
+const PTE_S2AP_RW: u64 = (0x3 << PTE_AP_OFF);
 
 pub const PTE_HYP_FLAGS: u64 = pte_attr(1) | PTE_AP_RW | PTE_SH_IS | PTE_AF;
+pub const PTE_VM_FLAGS: u64 =
+    PTE_MEMATTR_NRML_OWBC | PTE_MEMATTR_NRML_IWBC | PTE_SH_NS | PTE_S2AP_RW | PTE_AF;
 pub const PTE_HYP_DEV_FLAGS: u64 = pte_attr(2) | PTE_AP_RW | PTE_SH_IS | PTE_AF | PTE_XN;
 // pub const PTE_VM_DEV_FLAGS: u64 = ;
 

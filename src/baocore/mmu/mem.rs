@@ -16,14 +16,14 @@ use crate::{
     },
     baocore::{
         cpu::mycpu,
-        mem::{mem_alloc_ppages, PPages},
+        mem::{mem_alloc_page, mem_alloc_ppages, PPages},
         pagetable::{root_pt_addr, Pagetable},
         types::{AsSecID, AsType, Asid, ColorMap, MemFlags, Paddr, Vaddr, MAX_VA},
     },
-    util::{is_aligned, num_pages, BaoError, BaoResult},
+    util::{clear_memory, is_aligned, num_pages, BaoError, BaoResult},
 };
 
-use super::sections::mem_get_sections;
+use super::sections::{mem_get_sections, SEC_HYP_PRIVATE, SEC_HYP_VM};
 
 pub const HYP_ASID: u64 = 0;
 
@@ -41,17 +41,39 @@ pub trait AsArchTrait {
 }
 
 impl AddrSpace {
-    pub fn init(&mut self, as_type: AsType, id: Asid, root_pt: Vaddr, colors: ColorMap) {
+    pub fn init(
+        &mut self,
+        as_type: AsType,
+        id: Asid,
+        mut root_pt: Option<Vaddr>,
+        colors: ColorMap,
+    ) {
         self.as_type = as_type;
         self.colors = colors;
         self.id = id;
+        self.lock = Mutex::new(());
 
-        if root_pt == 0 {
-            todo!();
+        if root_pt.is_none() {
+            self.pt.dscr = match as_type {
+                AsType::AsVM => VM_PT_DSCR,
+                _ => HYP_PT_DSCR,
+            };
+            let n = num_pages(self.pt.pt_size(0));
+            let root = mem_alloc_page(
+                n,
+                match as_type {
+                    AsType::AsVM => SEC_HYP_VM,
+                    _ => SEC_HYP_PRIVATE,
+                },
+                false,
+            )
+            .unwrap();
+            clear_memory(root, n * PAGE_SIZE);
+            root_pt = Some(root);
         }
 
         self.pt = Pagetable {
-            root: root_pt,
+            root: root_pt.unwrap(),
             dscr: match as_type {
                 AsType::AsVM => VM_PT_DSCR,
                 _ => HYP_PT_DSCR,
@@ -343,5 +365,7 @@ impl AddrSpace {
 
 pub fn mem_prot_init() {
     let root_pt = root_pt_addr();
-    mycpu().addr_space.init(AsType::AsHyp, HYP_ASID, root_pt, 0);
+    mycpu()
+        .addr_space
+        .init(AsType::AsHyp, HYP_ASID, Some(root_pt), 0);
 }

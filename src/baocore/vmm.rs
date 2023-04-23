@@ -15,7 +15,7 @@ use super::{
         vmm::{vmm_get_vm_install_info, vmm_vm_install},
     },
     types::CpuMap,
-    vm::{VCpu, VMAllocation, VMInstallInfo, VM},
+    vm::{vm_init, VCpu, VMAllocation, VMInstallInfo, VM},
 };
 
 struct VMAssign {
@@ -99,7 +99,9 @@ pub fn init() {
     let (master, vm_id) = vmm_assign_vcpu();
     match vm_id {
         Some(vm_id) => {
-            let _vm_alloc = vmm_alloc_install_vm(vm_id, master);
+            let vm_alloc = vmm_alloc_install_vm(vm_id, master);
+            let cfg = CONFIG.read();
+            vm_init(&vm_alloc, &cfg.vmlist[vm_id], master, vm_id);
         }
         _ => todo!("cpu_idle"),
     }

@@ -15,6 +15,7 @@ use crate::{
 use super::{
     mmu::mem::AddrSpace,
     types::{CpuID, Paddr},
+    vm::VCpu,
 };
 
 #[repr(C)]
@@ -28,7 +29,7 @@ pub struct Cpu {
     pub id: CpuID,
     pub handling_msgs: bool,
     pub addr_space: AddrSpace,
-    // vcpu: *mut Vcpu,
+    pub vcpu: *mut VCpu,
     pub arch: CpuArch,
     // interface: *mut CpuIf,
     stack: CpuStack,
@@ -64,15 +65,19 @@ struct SyncTokenInner {
     count: usize,
 }
 
-pub static CPU_SYNC_TOKEN: SyncToken = SyncToken {
-    inner: Mutex::new(SyncTokenInner {
-        ready: false,
-        n: 0,
-        count: 0,
-    }),
-};
+pub static CPU_SYNC_TOKEN: SyncToken = SyncToken::new();
 
 impl SyncToken {
+    pub const fn new() -> Self {
+        Self {
+            inner: Mutex::new(SyncTokenInner {
+                ready: false,
+                n: 0,
+                count: 0,
+            }),
+        }
+    }
+
     pub fn sync_init(&self, n: usize) {
         let mut inner = self.inner.lock();
         inner.ready = true;

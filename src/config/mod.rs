@@ -1,9 +1,14 @@
 use alloc::vec::Vec;
 
-use crate::baocore::{
-    types::{Paddr, Vaddr},
-    vm::VMPlatform,
+use crate::{
+    arch::aarch64::defs::BAO_VAS_BASE,
+    baocore::{
+        types::{Paddr, Vaddr},
+        vm::VMPlatform,
+    },
 };
+
+use self::platform::qemu_aarch64_virt::linux_freertos::CONFIG;
 
 pub mod platform;
 
@@ -35,4 +40,17 @@ pub struct VMConfig {
 pub struct Config {
     pub shared_mem: Option<()>,
     pub vmlist: Vec<VMConfig>,
+}
+
+fn adjust_vm_image_addr(load_addr: Paddr) {
+    let mut config = CONFIG.write();
+    for vm_config in config.vmlist.iter_mut() {
+        if !vm_config.separately_loaded {
+            vm_config.load_addr = vm_config.load_addr - BAO_VAS_BASE as u64 + load_addr;
+        }
+    }
+}
+
+pub fn init(load_addr: Paddr) {
+    adjust_vm_image_addr(load_addr);
 }
