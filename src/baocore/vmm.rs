@@ -1,5 +1,7 @@
+use core::{mem::MaybeUninit, ptr::null_mut};
+
 use alloc::vec::Vec;
-use spin::{Lazy, RwLock};
+use spin::{Lazy, RwLock, Mutex};
 
 use crate::{
     arch::aarch64::{defs::PAGE_SIZE, vmm::vmm_arch_init},
@@ -8,11 +10,11 @@ use crate::{
 };
 
 use super::{
-    cpu::{mycpu, CPU_SYNC_TOKEN},
+    cpu::{mycpu, CPU_SYNC_TOKEN, SyncToken},
     mem::mem_alloc_page,
     mmu::{
         sections::SEC_HYP_VM,
-        vmm::{vmm_get_vm_install_info, vmm_vm_install},
+        vmm::{vmm_get_vm_install_info, vmm_vm_install}
     },
     types::CpuMap,
     vm::{vm_init, VCpu, VMAllocation, VMInstallInfo, VM},
@@ -60,12 +62,23 @@ fn vmm_assign_vcpu() -> (bool, Option<usize>) {
     (master, vm_id)
 }
 
+#[allow(invalid_value)]
 fn vmm_alloc_vm(config: &VMConfig) -> VMAllocation {
     let vcpus_offset = align(core::mem::size_of::<VM>(), core::mem::align_of::<VCpu>());
     let vcpu_size = config.vm_platform.cpu_num * core::mem::size_of::<VCpu>();
     let total_size = align(vcpus_offset + vcpu_size, PAGE_SIZE);
 
     let allocation = mem_alloc_page(num_pages(total_size), SEC_HYP_VM, false).unwrap();
+    unsafe { *(allocation as *mut VM) = VM {
+        vcpus: null_mut(),
+        master: 0,
+        id: 0,
+        cpu_num: 0,
+        cpus: 0,
+        addr_space: MaybeUninit::uninit().assume_init(),
+        sync_token: SyncToken::new(),
+        lock: Mutex::new(()),
+    }};
     VMAllocation {
         base: allocation,
         size: total_size,

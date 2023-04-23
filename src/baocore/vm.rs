@@ -1,5 +1,3 @@
-use core::mem::MaybeUninit;
-
 use alloc::vec::Vec;
 use spin::Mutex;
 
@@ -73,14 +71,14 @@ pub trait VCpuArchTrait {
 }
 
 pub struct VM {
-    vcpus: *mut VCpu,
-    master: CpuID,
-    id: usize,
+    pub vcpus: *mut VCpu,
+    pub master: CpuID,
+    pub id: usize,
     pub cpu_num: usize,
-    cpus: CpuMap,
-    addr_space: AddrSpace,
-    sync_token: SyncToken,
-    lock: Mutex<()>,
+    pub cpus: CpuMap,
+    pub addr_space: AddrSpace,
+    pub sync_token: SyncToken,
+    pub lock: Mutex<()>,
 }
 
 pub trait VMArchTrait {
@@ -91,9 +89,8 @@ impl VM {
     fn master_init(&mut self, config: &VMConfig, vm_id: usize) {
         self.master = mycpu().id;
         self.cpu_num = config.vm_platform.cpu_num;
-        self.id = vm_id;
-        self.sync_token = SyncToken::new();
         self.sync_token.sync_init(self.cpu_num);
+        self.id = vm_id;
         self.addr_space.init(AsType::AsVM, self.id as _, None, 0)
     }
 
@@ -173,7 +170,6 @@ impl VM {
 
     fn copy_img_to_rgn(&mut self, config: &VMConfig, reg: &VMMemRegion) {
         // Map original image address
-        println!("[{}]copy_img_to_rgn", mycpu().id);
         let n_img = num_pages(config.size);
         let src_pa_img = PPages::new(config.load_addr, n_img);
         let src_va = mycpu()
@@ -207,7 +203,6 @@ impl VM {
     }
 
     fn map_mem_region(&mut self, reg: &VMMemRegion) {
-        println!("start map_mem_region");
         let n = num_pages(reg.size);
 
         let ppages = if reg.place_phys {
@@ -217,7 +212,6 @@ impl VM {
             None
         };
 
-        println!("ppa = {:#x?}", ppages);
         let va = self
             .addr_space
             .mem_alloc_map(SEC_VM_ANY, ppages.as_ref(), Some(reg.base), n, PTE_VM_FLAGS)
@@ -230,20 +224,12 @@ impl VM {
 #[allow(invalid_value)]
 fn vm_allocation_init(vm_alloc: &VMAllocation) -> &'static mut VM {
     let vm = unsafe { &mut *(vm_alloc.base as *mut VM) } as &'static mut VM;
-    *vm = VM {
-        vcpus: (vm_alloc.base + vm_alloc.vcpus_offset as u64) as *mut _,
-        master: 0,
-        id: 0,
-        cpu_num: 0,
-        sync_token: SyncToken::new(),
-        addr_space: unsafe { MaybeUninit::uninit().assume_init() },
-        lock: Mutex::new(()),
-        cpus: 0,
-    };
+    vm.vcpus = (vm_alloc.base + vm_alloc.vcpus_offset as u64) as *mut _;
     vm
 }
 
 pub fn vm_init(vm_alloc: &VMAllocation, config: &VMConfig, master: bool, vm_id: usize) {
+    // println!("vm_init");
     let vm = vm_allocation_init(vm_alloc);
     if master {
         vm.master_init(config, vm_id);
@@ -258,5 +244,8 @@ pub fn vm_init(vm_alloc: &VMAllocation, config: &VMConfig, master: bool, vm_id: 
 
     if master {
         vm.init_mem_regions(config);
+        println!("master finally done");
     }
+
+    vm.sync_token.sync_barrier();
 }

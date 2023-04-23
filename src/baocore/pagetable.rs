@@ -1,11 +1,15 @@
 use core::mem::size_of;
 
-use crate::arch::aarch64::{
-    armv8_a::pagetable::{
-        pte_mask, PageTableArch, PageTableDescriptor, PTE, PTE_HYP_FLAGS, PTE_PAGE, PTE_SIZE,
-        PTE_SUPERPAGE, PTE_TABLE,
+use crate::{
+    arch::aarch64::{
+        armv8_a::pagetable::{
+            pte_mask, PageTableArch, PageTableDescriptor, PTE, PTE_HYP_FLAGS, PTE_PAGE, PTE_SIZE,
+            PTE_SUPERPAGE, PTE_TABLE,
+        },
+        defs::{BAO_CPU_BASE, PAGE_SIZE},
     },
-    defs::BAO_CPU_BASE,
+    println,
+    util::align_floor,
 };
 
 use super::{
@@ -27,8 +31,8 @@ impl Pagetable {
 
     pub fn pt_set_recursive(&mut self, index: usize) {
         let root_pt_pa = mycpu().addr_space.mem_translate(self.root).unwrap();
-        let pte = (self.root + (index * PTE_SIZE) as u64) as *mut PTE;
-        unsafe { *pte = PTE::new(root_pt_pa, PTE_TABLE, PTE_HYP_FLAGS) };
+        let hyp_pte = (mycpu().addr_space.pt.root + (index * PTE_SIZE) as u64) as *mut PTE;
+        unsafe { *hyp_pte = PTE::new(root_pt_pa, PTE_TABLE, PTE_HYP_FLAGS) };
         self.arch.rec_index = index;
         self.arch.rec_mask = 0;
         let cpu_rec_index = mycpu().addr_space.pt.arch.rec_index;
@@ -49,6 +53,13 @@ impl Pagetable {
             ((va >> self.dscr.lvl_off[lvl]) * PTE_SIZE as u64) & pte_mask(0, rec_ind_off as u64);
 
         addr as *mut PTE
+    }
+
+    pub fn pt_get(&self, lvl: usize, va: Vaddr) -> *mut PTE {
+        if lvl == 0 {
+            return self.root as _;
+        }
+        align_floor(self.pt_get_pte(lvl, va) as usize, PAGE_SIZE) as _
     }
 
     pub fn pt_size(&self, lvl: usize) -> usize {

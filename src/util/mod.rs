@@ -1,7 +1,5 @@
 pub mod bitmap;
 
-use core::slice::from_raw_parts_mut;
-
 use crate::{arch::aarch64::defs::PAGE_SIZE, baocore::types::Vaddr};
 
 #[inline]
@@ -69,8 +67,8 @@ pub fn num_pages(sz: usize) -> usize {
 }
 
 pub fn clear_memory(va: Vaddr, sz: usize) {
-    unsafe {
-        from_raw_parts_mut(va as _, sz).fill(0);
+    for addr in va..va+sz as u64{
+       unsafe {(addr as *mut u8).write_volatile(0); }
     }
 }
 

@@ -68,6 +68,7 @@ impl AddrSpace {
                 true,
             )
             .unwrap();
+            unsafe { *(root as *mut usize) = 99999; }
             clear_memory(root, n * PAGE_SIZE);
             root_pt = Some(root);
         }
@@ -156,6 +157,7 @@ impl AddrSpace {
 
             while entry < nentries && count < n && !failed {
                 let pte = unsafe { *pte_ptr };
+
                 if pte.check_rsw(PTE_RSW_RSRV) || pte.is_valid() && !pte.is_table(&self.pt, lvl) {
                     count = 0;
                     vpage = None;
@@ -169,7 +171,6 @@ impl AddrSpace {
                             vpage = Some(addr);
                         }
                         count += lvlsz / PAGE_SIZE;
-                        println!("{:#x?}/{:#x?}", count, addr);
                     } else {
                         self.alloc_pt_and_set(lvl, pte_ptr, addr);
                     }
@@ -302,12 +303,9 @@ impl AddrSpace {
         num_pages: usize,
         flags: MemFlags,
     ) -> BaoResult<Vaddr> {
-        println!("[{}]mem_alloc_start", mycpu().id);
         match self.mem_alloc_vpage(section, at, num_pages) {
             Some(va) =>  {
-                println!("[{}]mem_alloc_map {:#x?}", mycpu().id, va);
                 let r = self.mem_map(va, ppages, num_pages, flags);
-                println!("[{}]mem_map done {:#x?}", mycpu().id, va);
                 r
             }
             _ => Err(BaoError::NotFound),
@@ -359,7 +357,7 @@ impl AddrSpace {
                 let pte_dflt_val = PTE_INVALID | (unsafe { *pte_ptr }.0 & PTE_RSW_MSK);
                 unsafe { *pte_ptr = PTE::new(ppages.base, PTE_TABLE, PTE_HYP_FLAGS) }
                 fence_sync_write();
-                let temp_pt = self.pt.pt_get_pte(lvl + 1, vaddr);
+                let temp_pt = self.pt.pt_get(lvl + 1, vaddr);
                 for i in 0..self.pt.pt_nentries(lvl + 1) {
                     unsafe {
                         (*temp_pt.add(i)).0 = pte_dflt_val;
