@@ -42,6 +42,10 @@ pub struct PsciCtx {
     pub state: PsciState,
 }
 
+pub trait VCpuArchProfileTrait {
+    fn arch_profile_init(&mut self, vm: &VM);
+}
+
 impl VCpuArchTrait for VCpu {
     fn arch_init(&mut self, vm: &VM) {
         self.arch.vmpidr = cpuid_to_mpidr(vm, self.id);
@@ -53,7 +57,7 @@ impl VCpuArchTrait for VCpu {
             PsciState::Off
         };
 
-        // self.vcpu_arch_profile_init(vm);
+        self.arch_profile_init(vm);
         // self.vgic_cpu_init();
     }
     fn arch_reset(&mut self, entry: Vaddr) {

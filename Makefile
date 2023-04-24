@@ -1,8 +1,8 @@
 MODE?=debug
-rustup_target:=aarch64-unknown-none
+rustc_target:=aarch64-unknown-none
 toolchain_prefix:=aarch64-none-elf
 
-target_dir:=target/$(rustup_target)/$(MODE)
+target_dir:=target/$(rustc_target)/$(MODE)
 bao_elf:=$(target_dir)/rust-bao
 bao_bin:=$(target_dir)/rust-bao.bin
 bao_disasm:=$(target_dir)/rust-bao.asm
@@ -48,11 +48,14 @@ monitor:
 		-ex 'file $(bao_elf)'
 
 env:
-	rustup target add $(rustup_target)
+	rustup target add $(rustc_target)
 	rustup component add llvm-tools-preview
 
 clean:
 	cargo clean
+
+show-features:
+	rustc --print=target-features --target=$(rustc_target)
 
 $(bao_bin): build
 	@$(OBJCOPY) $(bao_elf) --strip-all -O binary $@

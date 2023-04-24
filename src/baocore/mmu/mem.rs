@@ -261,7 +261,6 @@ impl AddrSpace {
                         break;
                     } else if !pte.is_valid() {
                         self.alloc_pt_and_set(lvl, pte_ptr.unwrap(), vaddr);
-                        // self.mem_alloc_pt(pte, lvl, vaddr);
                     } else if !pte.is_table(&self.pt, lvl) {
                         panic!("trying to override previous mapping");
                     }
@@ -306,10 +305,7 @@ impl AddrSpace {
         flags: MemFlags,
     ) -> BaoResult<Vaddr> {
         match self.mem_alloc_vpage(section, at, num_pages) {
-            Some(va) => {
-                let r = self.mem_map(va, ppages, num_pages, flags);
-                r
-            }
+            Some(va) => self.mem_map(va, ppages, num_pages, flags),
             _ => Err(BaoError::NotFound),
         }
     }

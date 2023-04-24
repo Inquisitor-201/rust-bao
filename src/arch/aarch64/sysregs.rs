@@ -141,6 +141,11 @@ pub const VTCR_PS_48B: u64 = 5 << 16;
 pub const VTCR_PS_52B: u64 = 6 << 16;
 pub const VTCR_TBI: u64 = 1 << 20;
 
+/* VTTBR_EL2, Virtualization Translation Table Base Register */
+
+pub const VTTBR_VMID_OFF: u64 = 48;
+pub const VTTBR_VMID_LEN: u64 = 8;
+pub const VTTBR_VMID_MSK: u64 = ((1 << VTTBR_VMID_LEN) - 1) << VTTBR_VMID_OFF;
 /**
  * Default stage-2 translation control
  * ...

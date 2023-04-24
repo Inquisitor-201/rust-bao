@@ -9,6 +9,7 @@ pub mod vmm;
 
 #[macro_use]
 pub mod sysregs;
+pub mod exceptions;
 
 use core::arch::global_asm;
 
@@ -17,4 +18,6 @@ global_asm!(include_str!("boot.S"),
     cores_num_off = const crate::platform::PLATFORM_OFFSET,
     CPU_SIZE = const crate::baocore::cpu::CPU_SIZE);
 
-global_asm!(include_str!("exceptions.S"));
+global_asm!(include_str!("exceptions.S"),
+    CPU_SIZE = const crate::baocore::cpu::CPU_SIZE,
+);

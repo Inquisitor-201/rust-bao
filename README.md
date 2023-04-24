@@ -22,3 +22,6 @@ rust-lld -> gnu ld
 --------------------------------------------
 
 1. vbar_el2: Holds the vector base address for any exception that is taken to EL2.
+2. esr_el2: Holds syndrome information for an exception taken to EL2.
+
+s2_pt_va = 0xfe8000001000

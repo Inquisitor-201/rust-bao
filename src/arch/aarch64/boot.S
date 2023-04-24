@@ -98,7 +98,7 @@ _set_master_cpu:
 	mrs x3, tpidr_el2
     ldr x4, ={CPU_SIZE}
     add x3, x3, x4
-	mov SP, x3
+	mov sp, x3
 
 	/* If this is bsp (cpu 0) boot_clear bss */
 	cbnz x9, 1f
