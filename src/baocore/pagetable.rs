@@ -8,7 +8,6 @@ use crate::{
         },
         defs::{BAO_CPU_BASE, PAGE_SIZE},
     },
-    println,
     util::align_floor,
 };
 

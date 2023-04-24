@@ -18,3 +18,7 @@ todo:
 17. todo: mem_unmap
 18. vmm_arch_profile_init: parange??
 rust-lld -> gnu ld
+
+--------------------------------------------
+
+1. vbar_el2: Holds the vector base address for any exception that is taken to EL2.

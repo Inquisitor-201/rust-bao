@@ -1,13 +1,14 @@
 use alloc::vec::Vec;
-use spin::Mutex;
+use spin::{Mutex, RwLock};
 
 use crate::{
     arch::aarch64::{
         armv8_a::{
             pagetable::{PTE, PTE_HYP_FLAGS, PTE_VM_FLAGS},
-            vm::{ArchRegs, ArchVMPlatform, VCpuArch},
+            vm::ArchVMPlatform,
         },
         defs::PAGE_SIZE,
+        vm::{ArchRegs, PsciCtx, VCpuArch, PsciState},
     },
     config::VMConfig,
     println,
@@ -57,19 +58,30 @@ pub struct VMInstallInfo {
     pub vm_section_pte: PTE,
 }
 
+#[repr(C)]
 pub struct VCpu {
+    pub regs: ArchRegs,    // regs: should be put ahead
+    pub arch: VCpuArch,
     pub id: VCpuID,
     pub phys_id: CpuID,
-    pub regs: ArchRegs,
-    pub arch: VCpuArch,
+    pub active: bool,
     pub vm: *const VM,
 }
 
 pub trait VCpuArchTrait {
     fn arch_init(&mut self, vm: &VM);
     fn arch_reset(&mut self, entry: Vaddr);
+    fn arch_run(&mut self);
 }
 
+impl VCpu {
+    pub fn run(&mut self) {
+        self.active = true;
+        self.arch_run();
+    }
+}
+
+#[repr(C)]
 pub struct VM {
     pub vcpus: *mut VCpu,
     pub master: CpuID,
@@ -129,12 +141,19 @@ impl VM {
             id: vcpu_id,
             phys_id: mycpu().id,
             vm: self as _,
-            arch: VCpuArch { vmpidr: 0 },
+            arch: VCpuArch {
+                vmpidr: 0,
+                psci_ctx: RwLock::new(PsciCtx {
+                    entrypoint: 0,
+                    state: PsciState::Off,
+                }),
+            },
             regs: ArchRegs {
                 x: [0; 31],
                 elr_el2: 0,
                 spsr_el2: 0,
             },
+            active: false,
         };
         mycpu().vcpu = vcpu;
 
@@ -247,5 +266,5 @@ pub fn vm_init(vm_alloc: &VMAllocation, config: &VMConfig, master: bool, vm_id: 
         println!("master finally done");
     }
 
-    vm.sync_token.sync_barrier();
+    vm.sync_token.sync_and_clear_msg();
 }

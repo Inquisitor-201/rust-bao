@@ -26,10 +26,10 @@ pub struct CpuStack {
 
 #[repr(C)]
 pub struct Cpu {
+    pub vcpu: *mut VCpu,      // vcpu should be put ahead
     pub id: CpuID,
     pub handling_msgs: bool,
     pub addr_space: AddrSpace,
-    pub vcpu: *mut VCpu,
     pub arch: CpuArch,
     // interface: *mut CpuIf,
     stack: CpuStack,
@@ -45,7 +45,7 @@ pub trait CpuArchTrait {
     fn arch_init(&mut self, load_addr: Paddr);
 }
 
-pub const CPU_SIZE: usize = core::mem::size_of::<Cpu>();
+pub const CPU_SIZE: usize = size_of::<Cpu>();
 
 pub fn mycpu() -> &'static mut Cpu {
     unsafe { &mut *(BAO_CPU_BASE as *mut Cpu) }
@@ -55,10 +55,12 @@ pub fn mem_cpu_boot_alloc_size() -> usize {
     size_of::<Cpu>() + mycpu().addr_space.pt.dscr.lvls * PAGE_SIZE
 }
 
+#[repr(C)]
 pub struct SyncToken {
     inner: Mutex<SyncTokenInner>,
 }
 
+#[repr(C)]
 struct SyncTokenInner {
     ready: bool,
     n: usize,

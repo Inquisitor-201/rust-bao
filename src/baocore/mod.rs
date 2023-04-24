@@ -17,7 +17,7 @@ use types::{CpuID, Paddr};
 use crate::baocore::cpu::mycpu;
 
 #[no_mangle]
-pub fn init(cpu_id: CpuID, load_addr: Paddr) {
+pub fn init(cpu_id: CpuID, load_addr: Paddr) -> ! {
     // allocator::heap_init(cpu_id);
     cpu::init(cpu_id, load_addr);
     mem::init(load_addr);
@@ -25,5 +25,5 @@ pub fn init(cpu_id: CpuID, load_addr: Paddr) {
     println!("[Cpu {}] Welcome to rust-bao!", mycpu().id);
     intr::init();
     vmm::init();
-    loop {}
+    panic!("Should never reach here");
 }

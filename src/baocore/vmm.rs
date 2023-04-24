@@ -115,6 +115,7 @@ pub fn init() {
             let vm_alloc = vmm_alloc_install_vm(vm_id, master);
             let cfg = CONFIG.read();
             vm_init(&vm_alloc, &cfg.vmlist[vm_id], master, vm_id);
+            unsafe { (*mycpu().vcpu).run(); }
         }
         _ => todo!("cpu_idle"),
     }
