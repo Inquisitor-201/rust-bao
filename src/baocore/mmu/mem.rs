@@ -68,7 +68,9 @@ impl AddrSpace {
                 true,
             )
             .unwrap();
-            unsafe { *(root as *mut usize) = 99999; }
+            unsafe {
+                *(root as *mut usize) = 99999;
+            }
             clear_memory(root, n * PAGE_SIZE);
             root_pt = Some(root);
         }
@@ -304,7 +306,7 @@ impl AddrSpace {
         flags: MemFlags,
     ) -> BaoResult<Vaddr> {
         match self.mem_alloc_vpage(section, at, num_pages) {
-            Some(va) =>  {
+            Some(va) => {
                 let r = self.mem_map(va, ppages, num_pages, flags);
                 r
             }

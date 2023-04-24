@@ -1,7 +1,7 @@
 use core::{mem::MaybeUninit, ptr::null_mut};
 
 use alloc::vec::Vec;
-use spin::{Lazy, RwLock, Mutex};
+use spin::{Lazy, Mutex, RwLock};
 
 use crate::{
     arch::aarch64::{defs::PAGE_SIZE, vmm::vmm_arch_init},
@@ -10,11 +10,11 @@ use crate::{
 };
 
 use super::{
-    cpu::{mycpu, CPU_SYNC_TOKEN, SyncToken},
+    cpu::{mycpu, SyncToken, CPU_SYNC_TOKEN},
     mem::mem_alloc_page,
     mmu::{
         sections::SEC_HYP_VM,
-        vmm::{vmm_get_vm_install_info, vmm_vm_install}
+        vmm::{vmm_get_vm_install_info, vmm_vm_install},
     },
     types::CpuMap,
     vm::{vm_init, VCpu, VMAllocation, VMInstallInfo, VM},
@@ -69,16 +69,18 @@ fn vmm_alloc_vm(config: &VMConfig) -> VMAllocation {
     let total_size = align(vcpus_offset + vcpu_size, PAGE_SIZE);
 
     let allocation = mem_alloc_page(num_pages(total_size), SEC_HYP_VM, false).unwrap();
-    unsafe { *(allocation as *mut VM) = VM {
-        vcpus: null_mut(),
-        master: 0,
-        id: 0,
-        cpu_num: 0,
-        cpus: 0,
-        addr_space: MaybeUninit::uninit().assume_init(),
-        sync_token: SyncToken::new(),
-        lock: Mutex::new(()),
-    }};
+    unsafe {
+        *(allocation as *mut VM) = VM {
+            vcpus: null_mut(),
+            master: 0,
+            id: 0,
+            cpu_num: 0,
+            cpus: 0,
+            addr_space: MaybeUninit::uninit().assume_init(),
+            sync_token: SyncToken::new(),
+            lock: Mutex::new(()),
+        }
+    };
     VMAllocation {
         base: allocation,
         size: total_size,
@@ -115,7 +117,9 @@ pub fn init() {
             let vm_alloc = vmm_alloc_install_vm(vm_id, master);
             let cfg = CONFIG.read();
             vm_init(&vm_alloc, &cfg.vmlist[vm_id], master, vm_id);
-            unsafe { (*mycpu().vcpu).run(); }
+            unsafe {
+                (*mycpu().vcpu).run();
+            }
         }
         _ => todo!("cpu_idle"),
     }

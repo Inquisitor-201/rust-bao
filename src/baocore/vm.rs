@@ -8,7 +8,7 @@ use crate::{
             vm::ArchVMPlatform,
         },
         defs::PAGE_SIZE,
-        vm::{ArchRegs, PsciCtx, VCpuArch, PsciState},
+        vm::{ArchRegs, PsciCtx, PsciState, VCpuArch},
     },
     config::VMConfig,
     println,
@@ -60,7 +60,7 @@ pub struct VMInstallInfo {
 
 #[repr(C)]
 pub struct VCpu {
-    pub regs: ArchRegs,    // regs: should be put ahead
+    pub regs: ArchRegs, // regs: should be put ahead
     pub arch: VCpuArch,
     pub id: VCpuID,
     pub phys_id: CpuID,

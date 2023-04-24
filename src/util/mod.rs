@@ -67,8 +67,10 @@ pub fn num_pages(sz: usize) -> usize {
 }
 
 pub fn clear_memory(va: Vaddr, sz: usize) {
-    for addr in va..va+sz as u64{
-       unsafe {(addr as *mut u8).write_volatile(0); }
+    for addr in va..va + sz as u64 {
+        unsafe {
+            (addr as *mut u8).write_volatile(0);
+        }
     }
 }
 

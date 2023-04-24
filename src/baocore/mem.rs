@@ -13,8 +13,8 @@ use crate::{
     config,
     platform::PLATFORM,
     util::{
-        align, bitmap::Bitmap, image_load_size, image_noload_size, image_size, num_pages,
-        range_in_range, vm_image_size, BaoError, BaoResult, is_aligned,
+        align, bitmap::Bitmap, image_load_size, image_noload_size, image_size, is_aligned,
+        num_pages, range_in_range, vm_image_size, BaoError, BaoResult,
     },
 };
 
@@ -227,7 +227,7 @@ impl MemPagePool {
             loop {
                 match bitmap.find_consec(curr, num_pages, false) {
                     Some(bit) => {
-                        if aligned && !is_aligned(base + bit, num_pages){
+                        if aligned && !is_aligned(base + bit, num_pages) {
                             curr = align(base + bit, num_pages) - base;
                             continue;
                         }
@@ -237,7 +237,7 @@ impl MemPagePool {
                         self.last = bit + num_pages;
                         return Some(p);
                     }
-                    None =>  {
+                    None => {
                         curr = 0;
                         break;
                     }

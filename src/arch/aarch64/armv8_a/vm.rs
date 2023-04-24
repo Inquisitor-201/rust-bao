@@ -10,7 +10,3 @@ pub struct VGicDscr {
 pub struct ArchVMPlatform {
     pub gic: VGicDscr,
 }
-
-
-
-

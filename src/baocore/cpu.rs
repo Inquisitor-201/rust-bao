@@ -26,7 +26,7 @@ pub struct CpuStack {
 
 #[repr(C)]
 pub struct Cpu {
-    pub vcpu: *mut VCpu,      // vcpu should be put ahead
+    pub vcpu: *mut VCpu, // vcpu should be put ahead
     pub id: CpuID,
     pub handling_msgs: bool,
     pub addr_space: AddrSpace,
