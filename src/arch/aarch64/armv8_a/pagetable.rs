@@ -93,17 +93,17 @@ const ARMV8_PT_S2_DSCR: PageTableDescriptor = PageTableDescriptor {
     lvl_term: [false, true, true, true],
 };
 
-// pub const ARMV8_PT_S2_SMALL_DSCR: PageTableDescriptor = PageTableDescriptor {
-//     lvls: 3,
-//     lvl_wdt: [39, 30, 21, 0],
-//     lvl_off: [30, 21, 12, 0],
-//     lvl_term: [false, true, true, true],
-// };
+pub const ARMV8_PT_S2_SMALL_DSCR: PageTableDescriptor = PageTableDescriptor {
+    lvls: 3,
+    lvl_wdt: [39, 30, 21, 0],
+    lvl_off: [30, 21, 12, 0],
+    lvl_term: [false, true, true, true],
+};
 
 pub const PARANGE_TABLE: [usize; 6] = [32, 36, 40, 42, 44, 48];
 
 pub const HYP_PT_DSCR: &PageTableDescriptor = &ARMV8_PT_DSCR;
-pub const VM_PT_DSCR: &PageTableDescriptor = &ARMV8_PT_S2_DSCR;
+pub static mut VM_PT_DSCR: &PageTableDescriptor = &ARMV8_PT_S2_DSCR;
 
 #[macro_export]
 macro_rules! pt_cpu_rec_index {

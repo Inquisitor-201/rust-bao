@@ -1,3 +1,5 @@
+use core::arch::asm;
+
 use aarch64::regs::VTTBR_EL2;
 use tock_registers::interfaces::Writeable;
 
@@ -31,10 +33,12 @@ impl VCpuArchProfileTrait for VCpu {
             .addr_space
             .mem_translate(vm.addr_space.pt.root)
             .unwrap();
-
         let vttbr =
             (((vm.id as u64) << VTTBR_VMID_OFF) & VTTBR_VMID_MSK) | (s2pt_root & !VTTBR_VMID_MSK);
         VTTBR_EL2.set(vttbr);
         isb();
+        unsafe {
+            asm!("tlbi vmalls12e1is");
+        }
     }
 }

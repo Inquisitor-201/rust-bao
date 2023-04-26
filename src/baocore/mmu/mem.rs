@@ -55,7 +55,7 @@ impl AddrSpace {
 
         if root_pt.is_none() {
             self.pt.dscr = match as_type {
-                AsType::AsVM => VM_PT_DSCR,
+                AsType::AsVM => unsafe { VM_PT_DSCR },
                 _ => HYP_PT_DSCR,
             };
             let n = num_pages(self.pt.pt_size(0));
@@ -78,7 +78,7 @@ impl AddrSpace {
         self.pt = Pagetable {
             root: root_pt.unwrap(),
             dscr: match as_type {
-                AsType::AsVM => VM_PT_DSCR,
+                AsType::AsVM => unsafe { VM_PT_DSCR },
                 _ => HYP_PT_DSCR,
             },
             arch: PageTableArch {

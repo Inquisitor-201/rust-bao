@@ -1,4 +1,4 @@
-use aarch64::regs::{ESR_EL2, FAR_EL2};
+use aarch64::regs::{ELR_EL2, ESR_EL2, FAR_EL2};
 use tock_registers::interfaces::Readable;
 
 use crate::println;
@@ -17,24 +17,29 @@ fn sync_exceptions_handler() {
         Some(ESR_EL2::EC::Value::Unknown) => {
             panic!("Unknown exception!");
         }
-        Some(ESR_EL2::EC::Value::InstrAbortLowerEL) => {
+        Some(ESR_EL2::EC::Value::InstrAbortLowerEL)
+        | Some(ESR_EL2::EC::Value::DataAbortLowerEL) => {
             panic!(
-                "InstrAbortLowerEL: ISS = {:#x}, \
+                "PageFault: ISS = {:#x}, \
                  GuestVaddr = {:#x?}, \
                  GuestPaddr = {:#x?}, \
-                 fault_addr = {:#x?}",
+                 fault_addr = {:#x?}, \
+                 instruction_addr = {:#x?}",
                 iss,
                 far,
                 hpfar << 8,
-                ipa_fault_addr
+                ipa_fault_addr,
+                ELR_EL2.get(),
             );
         }
         _ => {
             panic!(
-                "Unsupported synchronous exception: ESR = {:#x} (EC {:#08b}, ISS {:#x})",
+                "Unsupported synchronous exception: ESR = {:#x} (EC {:#08b}, ISS {:#x}) \
+                instruction_addr = {:#x?}",
                 esr.get(),
                 esr.read(ESR_EL2::EC),
                 iss,
+                ELR_EL2.get(),
             );
         }
     }

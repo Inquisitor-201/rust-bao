@@ -76,6 +76,7 @@ pub trait VCpuArchTrait {
 
 impl VCpu {
     pub fn run(&mut self) {
+        println!("[vcpu {}] run", self.id);
         self.active = true;
         self.arch_run();
     }
@@ -236,6 +237,12 @@ impl VM {
             .mem_alloc_map(SEC_VM_ANY, ppages.as_ref(), Some(reg.base), n, PTE_VM_FLAGS)
             .unwrap();
 
+        let mut v = reg.base;
+        while v < reg.base + (PAGE_SIZE * n) as u64 {
+            let hpa = self.addr_space.mem_translate(v).unwrap();
+            println!("test ok: {:#x?} => {:#x?}", v, hpa);
+            v += PAGE_SIZE as u64;
+        }
         assert_eq!(va, reg.base);
     }
 }
