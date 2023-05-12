@@ -8,7 +8,7 @@ use crate::{
             fences::{fence_sync, fence_sync_write},
             pagetable::{
                 PageTableArch, HYP_PT_DSCR, PTE, PTE_HYP_FLAGS, PTE_INVALID, PTE_RSW_MSK,
-                PTE_RSW_RSRV, PTE_TABLE, VM_PT_DSCR,
+                PTE_RSW_RSRV, PTE_TABLE, VM_PT_DSCR, PTE_VM_DEV_FLAGS,
             },
         },
         defs::PAGE_SIZE,
@@ -20,10 +20,10 @@ use crate::{
         pagetable::{root_pt_addr, Pagetable},
         types::{AsSecID, AsType, Asid, ColorMap, MemFlags, Paddr, Vaddr, MAX_VA},
     },
-    util::{clear_memory, is_aligned, num_pages, BaoError, BaoResult},
+    util::{clear_memory, is_aligned, num_pages, BaoError, BaoResult}, println,
 };
 
-use super::sections::{mem_get_sections, SEC_HYP_PRIVATE, SEC_HYP_VM};
+use super::sections::{mem_get_sections, SEC_HYP_PRIVATE, SEC_HYP_VM, SEC_HYP_GLOBAL};
 
 pub const HYP_ASID: u64 = 0;
 
@@ -322,13 +322,42 @@ impl AddrSpace {
             Some(va) => {
                 let flags = match self.as_type {
                     AsType::AsHyp => PTE_HYP_FLAGS,
-                    _ => todo!("PTE_VM_DEV_FLAGS"),
+                    AsType::AsVM => PTE_VM_DEV_FLAGS,
+                    AsType::AsHypCry => todo!()
                 };
                 let ppages = PPages::new(pa, num_pages);
                 self.mem_map(va, Some(&ppages), num_pages, flags)
             }
             _ => Err(BaoError::NotFound),
         }
+    }
+
+    pub fn mem_map_cpy(&mut self, src_as: &AddrSpace, mut src_va: Vaddr, dst_va: Option<Vaddr>, num_pages: usize) -> Vaddr {
+        let mut dst_va = self.mem_alloc_vpage(SEC_HYP_GLOBAL, dst_va, num_pages).unwrap();
+        let base = dst_va;
+
+        let mut count = 0;
+        let mut size_left = num_pages * PAGE_SIZE;
+        while count < num_pages {
+            let mut lvl = 0;
+            let mut pte = src_as.pt.pt_get_pte(lvl, src_va);
+            while !unsafe {*pte}.is_page(&src_as.pt, lvl) {
+                lvl += 1;
+                pte = src_as.pt.pt_get_pte(lvl, src_va);
+            }
+            let lvl_size = src_as.pt.pt_lvlsize(lvl);
+            let pa = unsafe {*pte}.pa() + src_va % lvl_size as u64;
+            let size = lvl_size.min(size_left);
+            let n = size / PAGE_SIZE;
+            println!("mapping: pa={:#x?}, n={:#x?}", pa, n);
+            self.mem_map(dst_va, Some(&PPages::new(pa, n)), n, PTE_HYP_FLAGS).unwrap();
+            dst_va += size as u64;
+            src_va += size as u64;
+            count += n;
+            size_left -= size;
+        }
+        assert_eq!(count, num_pages);
+        base
     }
 
     pub fn mem_translate(&self, va: Vaddr) -> Option<Paddr> {

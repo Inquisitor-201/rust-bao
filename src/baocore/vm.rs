@@ -7,7 +7,6 @@ use crate::{
             pagetable::{PTE, PTE_HYP_FLAGS, PTE_VM_FLAGS},
             vm::ArchVMPlatform,
         },
-        defs::PAGE_SIZE,
         vm::{ArchRegs, PsciCtx, PsciState, VCpuArch},
     },
     config::VMConfig,
@@ -20,7 +19,7 @@ use super::{
     mem::PPages,
     mmu::{
         mem::AddrSpace,
-        sections::{SEC_HYP_PRIVATE, SEC_VM_ANY},
+        sections::{SEC_HYP_GLOBAL, SEC_HYP_PRIVATE, SEC_VM_ANY},
     },
     types::{AsType, CpuID, CpuMap, IrqID, Paddr, VCpuID, Vaddr},
 };
@@ -33,8 +32,8 @@ pub struct VMMemRegion {
 }
 
 pub struct VMDeviceRegion {
+    pub va: Option<Vaddr>,
     pub pa: Paddr,
-    pub va: Vaddr,
     pub size: usize,
     pub interrupts: Vec<IrqID>,
 }
@@ -183,8 +182,7 @@ impl VM {
             // self.map_img_rgn_inplace(config, reg);
         } else {
             self.map_mem_region(reg);
-            todo!("install_image");
-            // self.install_image();
+            self.install_image(config);
         }
     }
 
@@ -211,11 +209,7 @@ impl VM {
             .mem_alloc_map(SEC_HYP_PRIVATE, Some(&dst_pp), None, n_img, PTE_HYP_FLAGS)
             .unwrap();
         unsafe {
-            core::ptr::copy_nonoverlapping(
-                dst_va as *const u8,
-                src_va as *mut u8,
-                n_img * PAGE_SIZE,
-            );
+            core::ptr::copy_nonoverlapping(src_va as *const u8, dst_va as *mut u8, config.size);
         }
         // todo: cache_flush_range(dst_va, n_img * PAGE_SIZE);
         // mem_unmap(&cpu().as_, src_va, n_img, false);
@@ -237,13 +231,41 @@ impl VM {
             .mem_alloc_map(SEC_VM_ANY, ppages.as_ref(), Some(reg.base), n, PTE_VM_FLAGS)
             .unwrap();
 
-        let mut v = reg.base;
-        while v < reg.base + (PAGE_SIZE * n) as u64 {
-            let hpa = self.addr_space.mem_translate(v).unwrap();
-            println!("test ok: {:#x?} => {:#x?}", v, hpa);
-            v += PAGE_SIZE as u64;
-        }
         assert_eq!(va, reg.base);
+    }
+
+    fn install_image(&self, config: &VMConfig) {
+        let img_num_pages = num_pages(config.size);
+        let img_ppages = PPages::new(config.load_addr, img_num_pages);
+        let src_va = mycpu()
+            .addr_space
+            .mem_alloc_map(
+                SEC_HYP_GLOBAL,
+                Some(&img_ppages),
+                None,
+                img_num_pages,
+                PTE_HYP_FLAGS,
+            )
+            .unwrap();
+        let dst_va =
+            mycpu()
+                .addr_space
+                .mem_map_cpy(&self.addr_space, config.base_addr, None, img_num_pages);
+        unsafe {
+            core::ptr::copy_nonoverlapping(src_va as *const u8, dst_va as *mut u8, config.size);
+        }
+    }
+
+    fn init_dev(&mut self, config: &VMConfig) {
+        for dev in config.vm_platform.devs.iter() {
+            if dev.va.is_some() {
+                let va = self
+                    .addr_space
+                    .mem_alloc_map_dev(SEC_VM_ANY, dev.pa, dev.va, num_pages(dev.size))
+                    .unwrap();
+                assert_eq!(va, dev.va.unwrap());
+            }
+        }
     }
 }
 
@@ -255,7 +277,6 @@ fn vm_allocation_init(vm_alloc: &VMAllocation) -> &'static mut VM {
 }
 
 pub fn vm_init(vm_alloc: &VMAllocation, config: &VMConfig, master: bool, vm_id: usize) {
-    // println!("vm_init");
     let vm = vm_allocation_init(vm_alloc);
     if master {
         vm.master_init(config, vm_id);
@@ -270,6 +291,7 @@ pub fn vm_init(vm_alloc: &VMAllocation, config: &VMConfig, master: bool, vm_id: 
 
     if master {
         vm.init_mem_regions(config);
+        vm.init_dev(config);
         println!("master finally done");
     }
 

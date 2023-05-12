@@ -63,7 +63,7 @@ pub const PTE_HYP_FLAGS: u64 = pte_attr(1) | PTE_AP_RW | PTE_SH_IS | PTE_AF;
 pub const PTE_VM_FLAGS: u64 =
     PTE_MEMATTR_NRML_OWBC | PTE_MEMATTR_NRML_IWBC | PTE_SH_NS | PTE_S2AP_RW | PTE_AF;
 pub const PTE_HYP_DEV_FLAGS: u64 = pte_attr(2) | PTE_AP_RW | PTE_SH_IS | PTE_AF | PTE_XN;
-// pub const PTE_VM_DEV_FLAGS: u64 = ;
+pub const PTE_VM_DEV_FLAGS: u64 = PTE_MEMATTR_DEV_GRE | PTE_SH_NS | PTE_S2AP_RW | PTE_AF;
 
 pub const PTE_RSW_OFF: u64 = 55;
 pub const PTE_RSW_WDT: u64 = 4;
@@ -130,6 +130,10 @@ impl PTE {
         Self((pa & PTE_ADDR_MSK) | ((pte_type | pte_flags) & PTE_FLAGS_MSK))
     }
 
+    pub fn pa(&self) -> Paddr {
+        self.0 & PTE_ADDR_MSK
+    }
+
     pub fn check_rsw(&self, flag: u64) -> bool {
         self.0 & PTE_RSW_MSK == flag & PTE_RSW_MSK
     }
@@ -140,6 +144,14 @@ impl PTE {
 
     pub fn is_table(&self, pt: &Pagetable, lvl: usize) -> bool {
         lvl != pt.dscr.lvls - 1 && (self.0 & PTE_TYPE_MSK == PTE_TABLE)
+    }
+
+    pub fn is_page(&self, pt: &Pagetable, lvl: usize) -> bool {
+        if !pt.dscr.lvl_term[lvl] {
+            return false;
+        }
+        (lvl != pt.dscr.lvls - 1 && (self.0 & PTE_TYPE_MSK == PTE_SUPERPAGE))
+            || (lvl == pt.dscr.lvls - 1 && (self.0 & PTE_TYPE_MSK == PTE_PAGE))
     }
 
     pub fn is_allocable(&self, pt: &Pagetable, lvl: usize, left: usize, addr: Vaddr) -> bool {
