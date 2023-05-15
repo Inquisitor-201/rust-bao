@@ -4,9 +4,9 @@ use alloc::vec::Vec;
 use spin::{Lazy, Mutex, RwLock};
 
 use crate::{
-    arch::aarch64::{defs::PAGE_SIZE, vmm::vmm_arch_init},
+    arch::aarch64::{defs::PAGE_SIZE, vmm::vmm_arch_init, vm::VMArch},
     config::{platform::qemu_aarch64_virt::linux_freertos::CONFIG, VMConfig},
-    util::{align, num_pages},
+    util::{align_up, num_pages},
 };
 
 use super::{
@@ -64,9 +64,9 @@ fn vmm_assign_vcpu() -> (bool, Option<usize>) {
 
 #[allow(invalid_value)]
 fn vmm_alloc_vm(config: &VMConfig) -> VMAllocation {
-    let vcpus_offset = align(core::mem::size_of::<VM>(), core::mem::align_of::<VCpu>());
+    let vcpus_offset = align_up(core::mem::size_of::<VM>(), core::mem::align_of::<VCpu>());
     let vcpu_size = config.vm_platform.cpu_num * core::mem::size_of::<VCpu>();
-    let total_size = align(vcpus_offset + vcpu_size, PAGE_SIZE);
+    let total_size = align_up(vcpus_offset + vcpu_size, PAGE_SIZE);
 
     let allocation = mem_alloc_page(num_pages(total_size), SEC_HYP_VM, false).unwrap();
     unsafe {
@@ -79,6 +79,9 @@ fn vmm_alloc_vm(config: &VMConfig) -> VMAllocation {
             addr_space: MaybeUninit::uninit().assume_init(),
             sync_token: SyncToken::new(),
             lock: Mutex::new(()),
+            arch: VMArch::new(),
+            emul_mem_list: Vec::new(),
+            emul_reg_list: Vec::new(),
         }
     };
     VMAllocation {

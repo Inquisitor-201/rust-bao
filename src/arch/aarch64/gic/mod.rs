@@ -1,6 +1,7 @@
 pub mod gic_defs;
 mod gicd;
 mod gicv3;
+mod vgicv3;
 pub mod vgic;
 
 use crate::{
@@ -27,6 +28,7 @@ pub enum GicVersion {
 }
 
 pub const GIC_VERSION: GicVersion = GicVersion::GicVersion3;
+pub use vgicv3::{vgic_init, gicd_reg_mask, VGIC_ENABLE_MASK};
 type Gic = GicV3;
 
 static mut GIC: Once<Gic> = Once::new();

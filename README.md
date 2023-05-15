@@ -25,3 +25,9 @@ rust-lld -> gnu ld
 2. esr_el2: Holds syndrome information for an exception taken to EL2.
 
 s2_pt_va = 0xfe8000001000
+
+--------------------------------------------
+
+upd: 2023-5-15
+
+1. vgic_update_enable

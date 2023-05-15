@@ -7,7 +7,7 @@ use crate::{
             pagetable::{PTE, PTE_HYP_FLAGS, PTE_VM_FLAGS},
             vm::ArchVMPlatform,
         },
-        vm::{ArchRegs, PsciCtx, PsciState, VCpuArch},
+        vm::{ArchRegs, PsciCtx, PsciState, VCpuArch, VMArch},
     },
     config::VMConfig,
     println,
@@ -21,7 +21,7 @@ use super::{
         mem::AddrSpace,
         sections::{SEC_HYP_GLOBAL, SEC_HYP_PRIVATE, SEC_VM_ANY},
     },
-    types::{AsType, CpuID, CpuMap, IrqID, Paddr, VCpuID, Vaddr},
+    types::{AsType, CpuID, CpuMap, IrqID, Paddr, VCpuID, Vaddr}, emul::{EmulMem, EmulReg, EmulHandler},
 };
 
 pub struct VMMemRegion {
@@ -59,12 +59,12 @@ pub struct VMInstallInfo {
 
 #[repr(C)]
 pub struct VCpu {
-    pub regs: ArchRegs, // regs: should be put ahead
+    pub regs: ArchRegs, // regs: must be the first field
     pub arch: VCpuArch,
     pub id: VCpuID,
     pub phys_id: CpuID,
     pub active: bool,
-    pub vm: *const VM,
+    pub vm: *mut VM,
 }
 
 pub trait VCpuArchTrait {
@@ -79,6 +79,23 @@ impl VCpu {
         self.active = true;
         self.arch_run();
     }
+
+    pub fn write_reg(&mut self, reg: u64, val: u64) {
+        assert!(reg <= 30);
+        self.regs.x[reg as usize] = val;
+    }
+
+    pub fn read_reg(&mut self, reg: u64) -> u64 {
+        self.regs.x[reg as usize]
+    }
+
+    pub fn write_pc(&mut self, val: u64) {
+        self.regs.elr_el2 = val;
+    }
+
+    pub fn read_pc(&self) -> u64 {
+        self.regs.elr_el2
+    }
 }
 
 #[repr(C)]
@@ -90,7 +107,19 @@ pub struct VM {
     pub cpus: CpuMap,
     pub addr_space: AddrSpace,
     pub sync_token: SyncToken,
+    pub arch: VMArch,
+    pub emul_mem_list: Vec<EmulMem>,
+    pub emul_reg_list: Vec<EmulReg>,
     pub lock: Mutex<()>,
+}
+
+
+pub fn myvcpu() -> &'static mut VCpu {
+    unsafe { &mut *(mycpu().vcpu) }
+}
+
+pub fn myvm() -> &'static mut VM {
+    unsafe { &mut *(*(mycpu().vcpu)).vm }
 }
 
 pub trait VMArchTrait {
@@ -140,7 +169,7 @@ impl VM {
         *vcpu = VCpu {
             id: vcpu_id,
             phys_id: mycpu().id,
-            vm: self as _,
+            vm: (self as *const VM as usize).clone() as _,
             arch: VCpuArch {
                 vmpidr: 0,
                 psci_ctx: RwLock::new(PsciCtx {
@@ -266,6 +295,24 @@ impl VM {
                 assert_eq!(va, dev.va.unwrap());
             }
         }
+    }
+
+    pub fn emul_get_mem(&self, addr: Vaddr) -> Option<EmulHandler> {
+        for emu in self.emul_mem_list.iter() {
+            println!("self.emul_mem_list = {:#x?} , {:#x?}", emu.va_base, emu.size);
+            if addr >= emu.va_base && addr < emu.va_base + emu.size as u64 {
+                return Some(emu.handler)
+            }
+        }
+        None
+    }
+
+    pub fn emul_add_mem(&mut self, emu: EmulMem) {
+        self.emul_mem_list.push(emu);
+    }
+
+    pub fn emul_add_reg(&mut self, emu: EmulReg) {
+        self.emul_reg_list.push(emu);
     }
 }
 

@@ -13,7 +13,7 @@ use crate::{
     config,
     platform::PLATFORM,
     util::{
-        align, bitmap::Bitmap, image_load_size, image_noload_size, image_size, is_aligned,
+        align_up, bitmap::Bitmap, image_load_size, image_noload_size, image_size, is_aligned,
         num_pages, range_in_range, vm_image_size, BaoError, BaoResult,
     },
 };
@@ -217,7 +217,7 @@ impl MemPagePool {
 
         let base = self.base as usize / PAGE_SIZE % num_pages;
         let mut curr = if aligned {
-            align(base + self.last, num_pages) - base
+            align_up(base + self.last, num_pages) - base
         } else {
             self.last
         };
@@ -228,7 +228,7 @@ impl MemPagePool {
                 match bitmap.find_consec(curr, num_pages, false) {
                     Some(bit) => {
                         if aligned && !is_aligned(base + bit, num_pages) {
-                            curr = align(base + bit, num_pages) - base;
+                            curr = align_up(base + bit, num_pages) - base;
                             continue;
                         }
                         let p = PPages::new(self.base + (bit * PAGE_SIZE) as u64, num_pages);

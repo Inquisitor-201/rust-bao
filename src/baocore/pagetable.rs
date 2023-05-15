@@ -8,7 +8,7 @@ use crate::{
         },
         defs::{BAO_CPU_BASE, PAGE_SIZE},
     },
-    util::align_floor,
+    util::align_down,
 };
 
 use super::{
@@ -58,7 +58,7 @@ impl Pagetable {
         if lvl == 0 {
             return self.root as _;
         }
-        align_floor(self.pt_get_pte(lvl, va) as usize, PAGE_SIZE) as _
+        align_down(self.pt_get_pte(lvl, va) as usize, PAGE_SIZE) as _
     }
 
     pub fn pt_size(&self, lvl: usize) -> usize {

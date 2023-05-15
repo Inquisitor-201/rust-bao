@@ -65,15 +65,15 @@ pub static CONFIG: Lazy<RwLock<Config>> = Lazy::new(|| {
             arch: ArchVMPlatform {
                 gic: VGicDscr {
                     gicd_addr: 0xf9010000,
-                    gicc_addr: 0xf9020000,
-                    gicr_addr: 0,
+                    gicc_addr: 0,
+                    gicr_addr: 0xf9020000,
                     interrupt_num: 0,
                 },
             },
         },
     };
 
-    let vm_config_linux = VMConfig {
+    let _vm_config_linux = VMConfig {
         base_addr: 0x60000000,
         load_addr: _linux_vm_beg as u64,
         size: (_linux_vm_end as usize - _linux_vm_beg as usize),

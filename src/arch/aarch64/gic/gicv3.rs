@@ -15,7 +15,7 @@ use crate::{
 
 #[repr(C)]
 #[repr(align(0x10000))]
-struct GicrHw {
+pub struct GicrHw {
     /* RD_base frame */
     CTLR: u32,
     IIDR: u32,

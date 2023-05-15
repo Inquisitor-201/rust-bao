@@ -8,6 +8,7 @@ pub mod pagetable;
 pub mod types;
 pub mod vm;
 pub mod vmm;
+pub mod emul;
 
 #[macro_use]
 pub mod console;

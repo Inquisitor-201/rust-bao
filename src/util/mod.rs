@@ -50,7 +50,7 @@ pub fn image_noload_size() -> usize {
     unsafe { &_image_end as *const _ as usize - &_image_load_end as *const _ as usize }
 }
 
-pub fn align(val: usize, to: usize) -> usize {
+pub fn align_up(val: usize, to: usize) -> usize {
     val.div_ceil(to) * to
 }
 
@@ -58,7 +58,7 @@ pub fn is_aligned(val: usize, to: usize) -> bool {
     val % to == 0
 }
 
-pub fn align_floor(val: usize, to: usize) -> usize {
+pub fn align_down(val: usize, to: usize) -> usize {
     val / to * to
 }
 
@@ -72,6 +72,10 @@ pub fn clear_memory(va: Vaddr, sz: usize) {
             (addr as *mut u8).write_volatile(0);
         }
     }
+}
+
+pub const fn bit64_extract(x: u64, off: u64, len: u64) -> u64 {
+    (x >> off) & ((1 << len) - 1)
 }
 
 pub const PAGE_OFFSET_MASK: usize = PAGE_SIZE - 1;

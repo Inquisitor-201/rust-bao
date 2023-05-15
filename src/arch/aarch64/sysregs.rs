@@ -216,6 +216,44 @@ pub const MPIDR_AFF_MSK: u64 = 0xffff;
 pub const PAR_F: u64 = 1;
 pub const PAR_PA_MSK: u64 = 0x3ffffff << 12;
 
+/* ESR_ELx, Exception Syndrome Register (ELx) */
+
+pub const ESR_ISS_DA_DSFC_OFF: u64 = 0;
+pub const ESR_ISS_DA_DSFC_LEN: u64 = 6;
+pub const ESR_ISS_DA_WnR_OFF: u64 = 6;
+pub const ESR_ISS_DA_WnR_LEN: u64 = 1;
+pub const ESR_ISS_DA_WnR_BIT: u64 = 1 << 6;
+pub const ESR_ISS_DA_S1PTW_OFF: u64 = 7;
+pub const ESR_ISS_DA_S1PTW_LEN: u64 = 1;
+pub const ESR_ISS_DA_CM_OFF: u64 = 8;
+pub const ESR_ISS_DA_CM_LEN: u64 = 1;
+pub const ESR_ISS_DA_EA_OFF: u64 = 9;
+pub const ESR_ISS_DA_EA_LEN: u64 = 1;
+pub const ESR_ISS_DA_FnV_OFF: u64 = 10;
+pub const ESR_ISS_DA_FnV_LEN: u64 = 1;
+pub const ESR_ISS_DA_FnV_BIT: u64 = 1_u64 << 10;
+pub const ESR_ISS_DA_SET_OFF: u64 = 11;
+pub const ESR_ISS_DA_SET_LEN: u64 = 2;
+pub const ESR_ISS_DA_AR_OFF: u64 = 14;
+pub const ESR_ISS_DA_AR_LEN: u64 = 1;
+pub const ESR_ISS_DA_SF_OFF: u64 = 15;
+pub const ESR_ISS_DA_SF_LEN: u64 = 1;
+pub const ESR_ISS_DA_SRT_OFF: u64 = 16;
+pub const ESR_ISS_DA_SRT_LEN: u64 = 5;
+pub const ESR_ISS_DA_SSE_OFF: u64 = 21;
+pub const ESR_ISS_DA_SSE_LEN: u64 = 1;
+pub const ESR_ISS_DA_SAS_OFF: u64 = 22;
+pub const ESR_ISS_DA_SAS_LEN: u64 = 2;
+pub const ESR_ISS_DA_ISV_OFF: u64 = 24;
+pub const ESR_ISS_DA_ISV_LEN: u64 = 1;
+pub const ESR_ISS_DA_ISV_BIT: u64 = 1_u64 << 24;
+
+pub const ESR_ISS_DA_DSFC_CODE: u64 = 0xf << 2;
+pub const ESR_ISS_DA_DSFC_ADDRSZ: u64 = 0x0;
+pub const ESR_ISS_DA_DSFC_TRNSLT: u64 = 0x4;
+pub const ESR_ISS_DA_DSFC_ACCESS: u64 = 0x8;
+pub const ESR_ISS_DA_DSFC_PERMIS: u64 = 0xC;
+
 pub const ICC_SRE_ENB_BIT: u64 = 0x8;
 pub const ICC_SRE_DIB_BIT: u64 = 0x4;
 pub const ICC_SRE_DFB_BIT: u64 = 0x2;

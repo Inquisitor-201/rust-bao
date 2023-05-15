@@ -9,7 +9,7 @@ use crate::{
         defs::{BAO_CPU_BASE, CPU_STACK_SIZE, PAGE_SIZE},
     },
     platform::PLATFORM,
-    util::align,
+    util::align_up,
 };
 
 use super::{
@@ -91,7 +91,7 @@ impl SyncToken {
         while !self.inner.lock().ready {}
         let mut inner = self.inner.lock();
         inner.count += 1;
-        let next_count = align(inner.count, inner.n);
+        let next_count = align_up(inner.count, inner.n);
         drop(inner);
 
         while self.inner.lock().count < next_count {}
@@ -101,7 +101,7 @@ impl SyncToken {
         while !self.inner.lock().ready {}
         let mut inner = self.inner.lock();
         inner.count += 1;
-        let next_count = align(inner.count, inner.n);
+        let next_count = align_up(inner.count, inner.n);
         drop(inner);
 
         while self.inner.lock().count < next_count {

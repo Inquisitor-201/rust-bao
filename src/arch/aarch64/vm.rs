@@ -10,9 +10,26 @@ use crate::{
     write_reg,
 };
 
+use super::gic::{vgic::VGicD, vgic_init};
+
 impl VMArchTrait for VM {
-    fn arch_init(&mut self, _config: &VMConfig) {
+    fn arch_init(&mut self, config: &VMConfig) {
         // TODO: Vgic init
+        vgic_init(self, &config.vm_platform.arch.gic);
+    }
+}
+
+pub struct VMArch {
+    pub vgicr_addr: Vaddr,
+    pub vgicd: VGicD
+}
+
+impl VMArch {
+    pub fn new() -> Self {
+        Self {
+            vgicr_addr: 0,
+            vgicd: VGicD::new()
+        }
     }
 }
 
@@ -62,7 +79,7 @@ impl VCpuArchTrait for VCpu {
     }
     fn arch_reset(&mut self, entry: Vaddr) {
         self.regs.spsr_el2 = SPSR_EL1h | SPSR_D | SPSR_A | SPSR_I | SPSR_F;
-        self.regs.elr_el2 = entry;
+        self.write_pc(entry);
         write_reg!(cntvoff_el2, 0u64);
         write_reg!(sctlr_el1, SCTLR_RES1);
         write_reg!(pmcr_el0, 0u64);
