@@ -31,3 +31,4 @@ s2_pt_va = 0xfe8000001000
 upd: 2023-5-15
 
 1. vgic_update_enable
+2. vgic_check_reg_alignment

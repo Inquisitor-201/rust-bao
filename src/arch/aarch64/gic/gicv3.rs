@@ -107,7 +107,7 @@ pub fn gic_map_mmio() -> (Vaddr, Vaddr) {
 pub struct GicV3 {
     gicd_base: Vaddr,
     gicr_base: Vaddr,
-    max_irqs: usize,
+    pub max_irqs: usize,
 }
 
 impl GicV3 {

@@ -4,6 +4,7 @@
 #![feature(alloc_error_handler)]
 #![feature(int_roundings)]
 #![feature(panic_info_message)]
+#![feature(exclusive_range_pattern)]
 
 extern crate alloc;
 

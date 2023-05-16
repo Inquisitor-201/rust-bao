@@ -7,7 +7,7 @@ use crate::{
             pagetable::{PTE, PTE_HYP_FLAGS, PTE_VM_FLAGS},
             vm::ArchVMPlatform,
         },
-        vm::{ArchRegs, PsciCtx, PsciState, VCpuArch, VMArch},
+        vm::{ArchRegs, PsciCtx, PsciState, VCpuArch, VMArch}, gic::vgic::VGicPriv,
     },
     config::VMConfig,
     println,
@@ -151,12 +151,12 @@ impl VM {
     }
 
     #[allow(unused)]
-    fn get_vcpu(&self, vcpuid: VCpuID) -> &VCpu {
+    pub fn get_vcpu(&self, vcpuid: VCpuID) -> &VCpu {
         assert!(vcpuid < self.cpu_num as _);
         unsafe { &*(self.vcpus.add(vcpuid as _)) }
     }
 
-    fn get_vcpu_mut(&self, vcpuid: VCpuID) -> &mut VCpu {
+    pub fn get_vcpu_mut(&self, vcpuid: VCpuID) -> &mut VCpu {
         assert!(vcpuid < self.cpu_num as _);
         unsafe { &mut *(self.vcpus.add(vcpuid as _)) }
     }
@@ -176,6 +176,7 @@ impl VM {
                     entrypoint: 0,
                     state: PsciState::Off,
                 }),
+                vgic_priv: VGicPriv::new(),
             },
             regs: ArchRegs {
                 x: [0; 31],
@@ -299,7 +300,6 @@ impl VM {
 
     pub fn emul_get_mem(&self, addr: Vaddr) -> Option<EmulHandler> {
         for emu in self.emul_mem_list.iter() {
-            println!("self.emul_mem_list = {:#x?} , {:#x?}", emu.va_base, emu.size);
             if addr >= emu.va_base && addr < emu.va_base + emu.size as u64 {
                 return Some(emu.handler)
             }

@@ -26,19 +26,19 @@ pub struct GicdHw {
     pub pad4: [u8; 0x0058 - 0x0054],
     pub CLRSPI_SR: u32,
     pub pad9: [u8; 0x0080 - 0x005C],
-    pub IGROUPR: [u32; gic_int_regs(GIC_MAX_INTERUPTS)],
-    pub ISENABLER: [u32; gic_int_regs(GIC_MAX_INTERUPTS)],
-    pub ICENABLER: [u32; gic_int_regs(GIC_MAX_INTERUPTS)],
-    pub ISPENDR: [u32; gic_int_regs(GIC_MAX_INTERUPTS)],
-    pub ICPENDR: [u32; gic_int_regs(GIC_MAX_INTERUPTS)],
-    pub ISACTIVER: [u32; gic_int_regs(GIC_MAX_INTERUPTS)],
-    pub ICACTIVER: [u32; gic_int_regs(GIC_MAX_INTERUPTS)],
-    pub IPRIORITYR: [u32; gic_prio_regs(GIC_MAX_INTERUPTS)],
-    pub ITARGETSR: [u32; gic_target_regs(GIC_MAX_INTERUPTS)],
-    pub ICFGR: [u32; gic_config_regs(GIC_MAX_INTERUPTS)],
-    pub IGPRMODR: [u32; gic_int_regs(GIC_MAX_INTERUPTS)],
+    pub IGROUPR: [u32; gic_int_regs(GIC_MAX_INTERUPTS)],      // 0x80
+    pub ISENABLER: [u32; gic_int_regs(GIC_MAX_INTERUPTS)],    // 0x100
+    pub ICENABLER: [u32; gic_int_regs(GIC_MAX_INTERUPTS)],    // 0x180
+    pub ISPENDR: [u32; gic_int_regs(GIC_MAX_INTERUPTS)],      // 0x200
+    pub ICPENDR: [u32; gic_int_regs(GIC_MAX_INTERUPTS)],      // 0x280
+    pub ISACTIVER: [u32; gic_int_regs(GIC_MAX_INTERUPTS)],    // 0x300
+    pub ICACTIVER: [u32; gic_int_regs(GIC_MAX_INTERUPTS)],    // 0x380
+    pub IPRIORITYR: [u32; gic_prio_regs(GIC_MAX_INTERUPTS)],  // 0x400
+    pub ITARGETSR: [u32; gic_target_regs(GIC_MAX_INTERUPTS)], // 0x800
+    pub ICFGR: [u32; gic_config_regs(GIC_MAX_INTERUPTS)],     // 0xc00
+    pub IGPRMODR: [u32; gic_int_regs(GIC_MAX_INTERUPTS)],     // 0xd00
     pub pad5: [u8; 0x0E00 - 0x0D80],
-    pub NSACR: [u32; gic_sec_regs(GIC_MAX_INTERUPTS)],
+    pub NSACR: [u32; gic_sec_regs(GIC_MAX_INTERUPTS)],        // 0xe00
     pub SGIR: u32,
     pub pad6: [u8; 0x0F10 - 0x0F04],
     pub CPENDSGIR: [u32; GIC_NUM_SGI_REGS],

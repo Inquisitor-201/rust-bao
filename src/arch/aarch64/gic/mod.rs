@@ -7,13 +7,13 @@ pub mod vgic;
 use crate::{
     baocore::{
         cpu::{mycpu, CPU_SYNC_TOKEN},
-        intr::interrupts_reserve,
+        intr::interrupts_reserve, types::IrqID,
     },
     platform::PLATFORM,
     write_reg,
 };
 
-use self::{gicv3::GicV3, vgic::gic_maintenance_handler};
+use self::{gicv3::GicV3, vgic::gic_maintenance_handler, gic_defs::{GIC_CPU_PRIV, GIC_MAX_SGIS}};
 
 use super::{
     armv8_a::fences::isb,
@@ -31,7 +31,15 @@ pub const GIC_VERSION: GicVersion = GicVersion::GicVersion3;
 pub use vgicv3::{vgic_init, gicd_reg_mask, VGIC_ENABLE_MASK};
 type Gic = GicV3;
 
-static mut GIC: Once<Gic> = Once::new();
+pub static mut GIC: Once<Gic> = Once::new();
+
+pub const fn gic_is_priv(int_id: IrqID) -> bool {
+    int_id < GIC_CPU_PRIV as _
+}
+
+pub const fn gic_is_sgi(int_id: IrqID) -> bool {
+    int_id < GIC_MAX_SGIS as _
+}
 
 pub fn init() {
     if let GicVersion::GicVersion3 = GIC_VERSION {

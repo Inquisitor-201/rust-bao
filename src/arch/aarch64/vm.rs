@@ -10,7 +10,7 @@ use crate::{
     write_reg,
 };
 
-use super::gic::{vgic::VGicD, vgic_init};
+use super::gic::{vgic::{VGicD, VGicPriv}, vgic_init};
 
 impl VMArchTrait for VM {
     fn arch_init(&mut self, config: &VMConfig) {
@@ -44,6 +44,7 @@ pub struct ArchRegs {
 #[repr(C)]
 pub struct VCpuArch {
     pub vmpidr: u64,
+    pub vgic_priv: VGicPriv,
     pub psci_ctx: RwLock<PsciCtx>,
 }
 
