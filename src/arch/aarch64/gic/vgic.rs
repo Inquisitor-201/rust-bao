@@ -1,27 +1,27 @@
 use alloc::vec::Vec;
-use spin::{Mutex, RwLock, RwLockReadGuard};
+use spin::{Mutex, RwLock};
 
 use crate::{
     arch::aarch64::gic::{gic_is_priv, gicd_reg_mask, VGIC_ENABLE_MASK},
     baocore::{
         emul::EmulAccess,
         types::{IrqID, VCpuID, Vaddr},
-        vm::{myvcpu, myvm, VCpu},
+        vm::{myvcpu, myvm},
     },
     println,
-    util::bit64_extract,
+    util::bit64_extract, debug,
 };
 
 use super::{gic_defs::{GICD_CTLR_ARE_NS_BIT, GIC_CPU_PRIV}, vgicv3::VGicR, GicVersion, GIC_VERSION};
 
 pub struct VGicIntr {
-    _inner: RwLock<VGicIntrInner>
+    inner: RwLock<VGicIntrInner>
 }
 
 impl VGicIntr {
     pub fn new() -> Self {
         Self {
-            _inner: RwLock::new(VGicIntrInner::new())
+            inner: RwLock::new(VGicIntrInner::new())
         }
     }
 
@@ -38,26 +38,22 @@ impl VGicIntrInner {
     }
 }
 
-pub struct VGicDInner {
+pub struct VGicD {
     pub interrupts: Vec<VGicIntr>,
     pub int_num: usize,
     pub ctlr: u32,
     pub typer: u32,
-}
-
-pub struct VGicD {
-    pub inner: RwLock<VGicDInner>,
+    pub lock: Mutex<()>
 }
 
 impl VGicD {
     pub fn new() -> Self {
         Self {
-            inner: RwLock::new(VGicDInner {
-                interrupts: Vec::new(),
-                int_num: 0,
-                ctlr: 0,
-                typer: 0,
-            }),
+            interrupts: Vec::new(),
+            int_num: 0,
+            ctlr: 0,
+            typer: 0,
+            lock: Mutex::new(()),
         }
     }
 }
@@ -102,13 +98,53 @@ pub fn vgicd_emul_handler(acc: &EmulAccess) -> bool {
             field_width: 0,
             regroup_base: 0,
         },
+        GICD_REG_GROUP_ISENABLER => VGicHandlerInfo {
+            reg_access: vgic_emul_generic_access,
+            field_width: 1,
+            regroup_base: GICD_REG_ISENABLER_OFF,
+        },
         GICD_REG_GROUP_ICENABLER => VGicHandlerInfo {
             reg_access: vgic_emul_generic_access,
             field_width: 1,
             regroup_base: GICD_REG_ICENABLER_OFF,
         },
-        _ => todo!("vgicd_emul_handler"),
+        GICD_REG_GROUP_ICPENDR => VGicHandlerInfo {
+            reg_access: vgic_emul_generic_access,
+            field_width: 1,
+            regroup_base: GICD_REG_ICPENDR_OFF,
+        },
+        GICD_REG_GROUP_ICACTIVER => VGicHandlerInfo {
+            reg_access: vgic_emul_generic_access,
+            field_width: 1,
+            regroup_base: GICD_REG_ICACTIVER_OFF,
+        },
+        _ => {
+            let gicd_reg = gicd_reg_mask(acc.addr);
+            if gicd_reg >= GICD_REG_IPRIORITYR_OFF && gicd_reg < (GICD_REG_IPRIORITYR_OFF + 0x400) {
+                VGicHandlerInfo {
+                    reg_access: vgic_emul_generic_access,
+                    regroup_base: GICD_REG_IPRIORITYR_OFF,
+                    field_width: 8,
+                }
+            } else if gicd_reg >= GICD_REG_ITARGETSR_OFF && gicd_reg < (GICD_REG_ITARGETSR_OFF + 0x400) {
+                VGicHandlerInfo {
+                    reg_access: vgic_emul_razwi,
+                    field_width: 0,
+                    regroup_base: 0,
+                }
+            } else if gicd_reg >= GICD_REG_IROUTER_OFF && gicd_reg < (GICD_REG_IROUTER_OFF + 0x2000) {
+                VGicHandlerInfo {
+                    reg_access: vgic_emul_generic_access,
+                    field_width: 64,
+                    regroup_base: GICD_REG_IROUTER_OFF,
+                }
+            } else {
+                todo!("vgicd_emul_handler");
+            }
+        }
     };
+
+    let _vgicd_mutex = myvm().arch.vgicd.lock.lock();
     (handler_info.reg_access)(acc, &handler_info, false, myvcpu().id);
     true
 }
@@ -121,21 +157,16 @@ pub struct VGicHandlerInfo {
 }
 
 fn vgic_get_int(
-    _vcpu: &VCpu,
     int_id: IrqID,
     vgicr_id: VCpuID,
-    _vgicd_lock: Option<RwLockReadGuard<VGicDInner>>,
 ) -> Option<&'static mut VGicIntr> {
     if gic_is_priv(int_id) {
-        return Some(&mut myvm().get_vcpu_mut(vgicr_id).arch.vgic_priv.interrupts[int_id as usize]);
+        Some(&mut myvm().get_vcpu_mut(vgicr_id).arch.vgic_priv.interrupts[int_id as usize])
+    } else if int_id < myvm().arch.vgicd.int_num as _ {
+        assert!(myvm().arch.vgicd.lock.is_locked());
+        Some(&mut myvm().arch.vgicd.interrupts[int_id as usize - GIC_CPU_PRIV])
     } else {
-        todo!();
-        // match vgicd_lock {
-        //     Some(vgicd) => {
-        //         vgicd.interrupts
-        //     },
-        //     _ => panic!("vgic_get_int: not a priv intr, must hold vgicd_lock")
-        // }
+        None
     }
 }
 
@@ -162,10 +193,9 @@ pub fn vgicd_emul_misc_access(
     match reg {
         GICD_REG_INDEX_CTLR => {
             if acc.write {
-                let mut inner = vgicd.inner.write();
                 // let prev_ctrl = inner.ctlr;
-                inner.ctlr = myvcpu().read_reg(acc.reg) as u32 & VGIC_ENABLE_MASK;
-
+                vgicd.ctlr = myvcpu().read_reg(acc.reg) as u32 & VGIC_ENABLE_MASK;
+                debug!("write gicd.ctlr: {:#x?}", vgicd.ctlr);
                 // if prev_ctrl ^ vgicd.CTLR != 0 {
                 //     vgic_update_enable(cpu().vcpu);
                 //     let msg = CpuMsg {
@@ -180,13 +210,15 @@ pub fn vgicd_emul_misc_access(
             } else {
                 myvcpu().write_reg(
                     acc.reg as u64,
-                    (vgicd.inner.read().ctlr | GICD_CTLR_ARE_NS_BIT) as u64,
+                    (vgicd.ctlr | GICD_CTLR_ARE_NS_BIT) as u64,
                 );
+                debug!("read gicd.ctlr: {:#x?}", vgicd.ctlr | GICD_CTLR_ARE_NS_BIT);
             }
         }
         GICD_REG_INDEX_TYPER => {
             if !acc.write {
-                myvcpu().write_reg(acc.reg, vgicd.inner.read().typer as _);
+                myvcpu().write_reg(acc.reg, vgicd.typer as _);
+                debug!("read gicd.typer: {:#x?}", vgicd.typer);
             }
         }
         // GICD_REG_IND(IIDR) => {
@@ -221,7 +253,7 @@ pub fn vgic_emul_generic_access(
 
     if valid_access {
         for i in 0..(acc.width * 8) / field_width {
-            let interrupt = vgic_get_int(myvcpu(), (first_int + i) as _, vgicr_id, None);
+            let interrupt = vgic_get_int((first_int + i) as _, vgicr_id);
             if interrupt.is_none() {
                 break;
             }
@@ -252,12 +284,20 @@ pub const GICD_REG_GROUP_CTLR: u64 = 0;
 pub const GICD_REG_INDEX_CTLR: u64 = 0;
 pub const GICD_REG_INDEX_TYPER: u64 = 4;
 
-// OTHER GROUPS
-pub const GICD_REG_GROUP_IGROUPR: u64 = 1;
-pub const GICD_REG_GROUP_ISENABLER: u64 = 2;
-pub const GICD_REG_GROUP_ICENABLER: u64 = 3;
-
+pub const GICD_REG_ISENABLER_OFF: u64 = 0x100;
 pub const GICD_REG_ICENABLER_OFF: u64 = 0x180;
 pub const GICD_REG_ICPENDR_OFF: u64 = 0x280;
 pub const GICD_REG_ICACTIVER_OFF: u64 = 0x380;
 pub const GICD_REG_IPRIORITYR_OFF: u64 = 0x400;
+pub const GICD_REG_ITARGETSR_OFF: u64 = 0x800;
+pub const GICD_REG_IROUTER_OFF: u64 = 0x6000;
+
+// OTHER GROUPS
+pub const GICD_REG_GROUP_IGROUPR: u64 = 0x80 >> 7;
+pub const GICD_REG_GROUP_ISENABLER: u64 = 0x100 >> 7;
+pub const GICD_REG_GROUP_ICENABLER: u64 = 0x180 >> 7;
+pub const GICD_REG_GROUP_ICPENDR: u64 = 0x280 >> 7;
+pub const GICD_REG_GROUP_ICACTIVER: u64 = 0x380 >> 7;
+pub const GICD_REG_GROUP_IPRIORITYR: u64 = 0x400 >> 7;
+pub const GICD_REG_GROUP_ITARGETSR: u64 = 0x800 >> 7;
+pub const GICD_REG_GROUP_IROUTER: u64 = 0x6000 >> 7;

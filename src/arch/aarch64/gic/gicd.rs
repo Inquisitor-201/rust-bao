@@ -44,7 +44,7 @@ pub struct GicdHw {
     pub CPENDSGIR: [u32; GIC_NUM_SGI_REGS],
     pub SPENDSGIR: [u32; GIC_NUM_SGI_REGS],
     pub pad7: [u8; 0x6000 - 0x0F30],
-    pub IROUTER: [u64; GIC_MAX_INTERUPTS],
+    pub IROUTER: [u64; GIC_MAX_INTERUPTS],                    // 0x6000
     pub pad8: [u8; 0xFFD0 - 0x8000],
     pub ID: [u32; (0x10000 - 0xFFD0) / core::mem::size_of::<u32>()],
 }

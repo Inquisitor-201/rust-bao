@@ -76,3 +76,11 @@ macro_rules! println {
         $crate::baocore::console::print(format_args!(concat!($fmt, "\n") $(, $($arg)+)?));
     }
 }
+
+#[macro_export]
+macro_rules! debug {
+    () => { $crate::console::println!("") };
+    ($($arg:tt)+) => {{
+        $crate::baocore::console::print(format_args!("\x1B[34m[debug] {}\n\x1B[0m", format_args!($($arg)+)));
+    }}
+}
