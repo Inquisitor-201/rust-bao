@@ -9,6 +9,7 @@ pub mod types;
 pub mod vm;
 pub mod vmm;
 pub mod emul;
+pub mod ipc;
 
 #[macro_use]
 pub mod console;

@@ -21,7 +21,7 @@ use super::{
         mem::AddrSpace,
         sections::{SEC_HYP_GLOBAL, SEC_HYP_PRIVATE, SEC_VM_ANY},
     },
-    types::{AsType, CpuID, CpuMap, IrqID, Paddr, VCpuID, Vaddr}, emul::{EmulMem, EmulReg, EmulHandler},
+    types::{AsType, CpuID, CpuMap, IrqID, Paddr, VCpuID, Vaddr}, emul::{EmulMem, EmulReg, EmulHandler}, ipc::{IPC, SHMEM_LIST},
 };
 
 pub struct VMMemRegion {
@@ -42,6 +42,7 @@ pub struct VMPlatform {
     pub cpu_num: usize,
     pub vm_regions: Vec<VMMemRegion>,
     pub devs: Vec<VMDeviceRegion>,
+    pub ipcs: Vec<IPC>,
     pub arch: ArchVMPlatform,
 }
 
@@ -110,6 +111,7 @@ pub struct VM {
     pub arch: VMArch,
     pub emul_mem_list: Vec<EmulMem>,
     pub emul_reg_list: Vec<EmulReg>,
+    pub ipcs: Vec<IPC>,
     pub lock: Mutex<()>,
 }
 
@@ -298,6 +300,32 @@ impl VM {
         }
     }
 
+    pub fn init_ipc(&mut self, config: &VMConfig) {
+        self.ipcs = config.vm_platform.ipcs.clone();
+        for ipc in config.vm_platform.ipcs.iter() {
+            let mut shmem_list = SHMEM_LIST.write();
+            let shmem = shmem_list.get_mut(ipc.shmem_id).unwrap();
+
+            let size = if ipc.size > shmem.size {
+                println!("Trying to map region to smaller shared memory. Truncated.");
+                shmem.size
+            } else {
+                ipc.size
+            };
+            
+            *shmem.cpu_masters.lock() |= 1 << mycpu().id;
+
+            let reg = VMMemRegion {
+                base: ipc.base,
+                size: size as _,
+                place_phys: true,
+                phys: shmem.phys.unwrap(),
+            };
+
+            self.map_mem_region(&reg);
+        }
+    }
+
     pub fn emul_get_mem(&self, addr: Vaddr) -> Option<EmulHandler> {
         for emu in self.emul_mem_list.iter() {
             if addr >= emu.va_base && addr < emu.va_base + emu.size as u64 {
@@ -339,6 +367,7 @@ pub fn vm_init(vm_alloc: &VMAllocation, config: &VMConfig, master: bool, vm_id: 
     if master {
         vm.init_mem_regions(config);
         vm.init_dev(config);
+        vm.init_ipc(config);
         println!("master finally done");
     }
 

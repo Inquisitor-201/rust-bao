@@ -17,7 +17,7 @@ use super::{
         vmm::{vmm_get_vm_install_info, vmm_vm_install},
     },
     types::CpuMap,
-    vm::{vm_init, VCpu, VMAllocation, VMInstallInfo, VM},
+    vm::{vm_init, VCpu, VMAllocation, VMInstallInfo, VM}, ipc,
 };
 
 struct VMAssign {
@@ -82,6 +82,7 @@ fn vmm_alloc_vm(config: &VMConfig) -> VMAllocation {
             arch: VMArch::new(),
             emul_mem_list: Vec::new(),
             emul_reg_list: Vec::new(),
+            ipcs: Vec::new(),
         }
     };
     VMAllocation {
@@ -112,6 +113,7 @@ fn vmm_alloc_install_vm(vm_id: usize, master: bool) -> VMAllocation {
 
 pub fn init() {
     vmm_arch_init();
+    ipc::init();
     CPU_SYNC_TOKEN.sync_barrier();
 
     let (master, vm_id) = vmm_assign_vcpu();

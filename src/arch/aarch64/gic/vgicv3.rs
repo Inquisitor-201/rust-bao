@@ -6,7 +6,7 @@ use crate::{
         defs::PAGE_SIZE,
         gic::vgic::{
             vgic_emul_generic_access, vgic_emul_razwi, VGicHandlerInfo, GICD_REG_ICACTIVER_OFF,
-            GICD_REG_ICENABLER_OFF, GICD_REG_ICPENDR_OFF, GICD_REG_IPRIORITYR_OFF,
+            GICD_REG_ICENABLER_OFF, GICD_REG_ICPENDR_OFF, GICD_REG_IPRIORITYR_OFF, GICD_REG_ISENABLER_OFF,
         },
     },
     baocore::{
@@ -79,6 +79,11 @@ fn vgicr_emul_handler(acc: &EmulAccess) -> bool {
             regroup_base: 0,
             field_width: 0,
         },
+        GICR_REG_ISENABLER0_OFF => VGicHandlerInfo {
+            reg_access: vgic_emul_generic_access,
+            regroup_base: GICD_REG_ISENABLER_OFF,
+            field_width: 1,
+        },
         GICR_REG_ICENABLER0_OFF => VGicHandlerInfo {
             reg_access: vgic_emul_generic_access,
             regroup_base: GICD_REG_ICENABLER_OFF,
@@ -129,6 +134,7 @@ pub const VGIC_ENABLE_MASK: u32 = 0x2;
 
 const GICR_REG_WAKER_OFF: u64 = 0x14;
 const GICR_REG_IGROUPR0_OFF: u64 = 0x10080;
+const GICR_REG_ISENABLER0_OFF: u64 = 0x10100;
 const GICR_REG_ICENABLER0_OFF: u64 = 0x10180;
 const GICR_REG_ICPENDR0_OFF: u64 = 0x10280;
 const GICR_REG_ICACTIVER0_OFF: u64 = 0x10380;

@@ -4,7 +4,7 @@ use crate::{
     arch::aarch64::defs::BAO_VAS_BASE,
     baocore::{
         types::{Paddr, Vaddr},
-        vm::VMPlatform,
+        vm::VMPlatform, ipc::SharedMemConfig,
     },
 };
 
@@ -38,7 +38,7 @@ pub struct VMConfig {
 }
 
 pub struct Config {
-    pub shared_mem: Option<()>,
+    pub shared_mem: Vec<SharedMemConfig>,
     pub vmlist: Vec<VMConfig>,
 }
 
