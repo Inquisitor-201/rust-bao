@@ -5,8 +5,11 @@ use crate::{
         armv8_a::vm::VGicDscr,
         defs::PAGE_SIZE,
         gic::vgic::{
-            vgic_emul_generic_access, vgic_emul_razwi, VGicHandlerInfo, GICD_REG_ICACTIVER_OFF,
-            GICD_REG_ICENABLER_OFF, GICD_REG_ICPENDR_OFF, GICD_REG_IPRIORITYR_OFF, GICD_REG_ISENABLER_OFF,
+            vgic_emul_generic_access, vgic_emul_razwi, vgic_int_clear_act, vgic_int_clear_enable,
+            vgic_int_clear_pend, vgic_int_enable_hw, vgic_int_get_act, vgic_int_get_enable,
+            vgic_int_get_pend, vgic_int_state_hw, VGicHandlerInfo, GICD_REG_ICACTIVER_OFF,
+            GICD_REG_ICENABLER_OFF, GICD_REG_ICPENDR_OFF, GICD_REG_IPRIORITYR_OFF,
+            GICD_REG_ISENABLER_OFF, vgic_int_get_prio, vgic_int_set_prio, vgic_int_set_prio_hw, vgic_int_set_enable,
         },
     },
     baocore::{
@@ -14,11 +17,18 @@ use crate::{
         types::Vaddr,
         vm::{myvm, VM},
     },
-    println,
+    println, read_reg,
     util::align_up,
+    write_reg,
 };
 
-use super::{gicd::GicdHw, gicv3::GicrHw, vgic::{vgicd_emul_handler, VGicIntr}, GIC};
+use super::{
+    gic_defs::GIC_CPU_PRIV,
+    gicd::GicdHw,
+    gicv3::GicrHw,
+    vgic::{vgicd_emul_handler, VGicIntr},
+    GIC,
+};
 
 pub const fn gicd_reg_mask(addr: Vaddr) -> u64 {
     addr & 0xffff
@@ -40,11 +50,8 @@ pub fn vgic_init(vm: &mut VM, vgic_dscrp: &VGicDscr) {
         | ((vm.cpu_num as u32 - 1) << 5)        // CPU_NUM
         | ((10 - 1) << 19); // TYPER_IDBITS
 
-    for _ in 0..vm.arch.vgicd.int_num {
-        vm.arch.vgicd.interrupts.push(VGicIntr::new());
-        // vm.arch.vgicd.interrupts[i].owner = NULL;
-        // vm.arch.vgicd.interrupts[i].lock = SPINLOCK_INITVAL;
-        // vm.arch.vgicd.interrupts[i].id = i + GIC_CPU_PRIV;
+    for i in 0..vm.arch.vgicd.int_num {
+        let intr = VGicIntr::new((i + GIC_CPU_PRIV) as _);
         // vm.arch.vgicd.interrupts[i].state = INV;
         // vm.arch.vgicd.interrupts[i].prio = GIC_LOWEST_PRIO;
         // vm.arch.vgicd.interrupts[i].cfg = 0;
@@ -53,6 +60,7 @@ pub fn vgic_init(vm: &mut VM, vgic_dscrp: &VGicDscr) {
         // vm.arch.vgicd.interrupts[i].hw = false;
         // vm.arch.vgicd.interrupts[i].in_lr = false;
         // vm.arch.vgicd.interrupts[i].enabled = false;
+        vm.arch.vgicd.interrupts.push(intr);
     }
 
     let vgicd_emul = EmulMem {
@@ -78,26 +86,41 @@ fn vgicr_emul_handler(acc: &EmulAccess) -> bool {
             reg_access: vgic_emul_razwi,
             regroup_base: 0,
             field_width: 0,
+            read_field: None,
+            update_field: None,
+            update_hw: None,
         },
         GICR_REG_ISENABLER0_OFF => VGicHandlerInfo {
             reg_access: vgic_emul_generic_access,
             regroup_base: GICD_REG_ISENABLER_OFF,
             field_width: 1,
+            read_field: Some(vgic_int_get_enable),
+            update_field: Some(vgic_int_set_enable),
+            update_hw: Some(vgic_int_enable_hw),
         },
         GICR_REG_ICENABLER0_OFF => VGicHandlerInfo {
             reg_access: vgic_emul_generic_access,
             regroup_base: GICD_REG_ICENABLER_OFF,
             field_width: 1,
+            read_field: Some(vgic_int_get_enable),
+            update_field: Some(vgic_int_clear_enable),
+            update_hw: Some(vgic_int_enable_hw),
         },
         GICR_REG_ICPENDR0_OFF => VGicHandlerInfo {
             reg_access: vgic_emul_generic_access,
             regroup_base: GICD_REG_ICPENDR_OFF,
             field_width: 1,
+            read_field: Some(vgic_int_get_pend),
+            update_field: Some(vgic_int_clear_pend),
+            update_hw: Some(vgic_int_state_hw),
         },
         GICR_REG_ICACTIVER0_OFF => VGicHandlerInfo {
             reg_access: vgic_emul_generic_access,
             regroup_base: GICD_REG_ICACTIVER_OFF,
             field_width: 1,
+            read_field: Some(vgic_int_get_act),
+            update_field: Some(vgic_int_clear_act),
+            update_hw: Some(vgic_int_state_hw),
         },
         _ => {
             if gicr_reg >= GICR_REG_IPRIORITYR_OFF && gicr_reg < (GICR_REG_IPRIORITYR_OFF + 0x20) {
@@ -105,6 +128,9 @@ fn vgicr_emul_handler(acc: &EmulAccess) -> bool {
                     reg_access: vgic_emul_generic_access,
                     regroup_base: GICD_REG_IPRIORITYR_OFF,
                     field_width: 8,
+                    read_field: Some(vgic_int_get_prio),
+                    update_field: Some(vgic_int_set_prio),
+                    update_hw: Some(vgic_int_set_prio_hw),
                 }
             } else {
                 todo!("vgicr_emul_handler");
@@ -119,6 +145,14 @@ fn vgicr_emul_handler(acc: &EmulAccess) -> bool {
     let _gicr_mutex = vcpu.arch.vgic_priv.vgicr.lock.lock();
     (handler_info.reg_access)(acc, &handler_info, true, vgcir_id);
     true
+}
+
+pub fn gich_get_hcr() -> u32 {
+    read_reg!(ich_hcr_el2) as u32
+}
+
+pub fn gich_set_hcr(hcr: u32) {
+    write_reg!(ich_hcr_el2, hcr as u64);
 }
 
 pub struct VGicR {

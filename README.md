@@ -28,7 +28,9 @@ s2_pt_va = 0xfe8000001000
 
 --------------------------------------------
 
-upd: 2023-5-15
+upd: 2023-5-16
 
-1. vgic_update_enable
+1. vm_msg_broadcast(cpu().vcpu.vm, &msg);
 2. vgic_check_reg_alignment
+3. vgic_remove_lr
+4. todo: reuse VGicHandlerInfo

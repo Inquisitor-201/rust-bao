@@ -7,7 +7,8 @@ use crate::{
             pagetable::{PTE, PTE_HYP_FLAGS, PTE_VM_FLAGS},
             vm::ArchVMPlatform,
         },
-        vm::{ArchRegs, PsciCtx, PsciState, VCpuArch, VMArch}, gic::vgic::VGicPriv,
+        gic::vgic::{vgic_set_hw, VGicPriv},
+        vm::{ArchRegs, PsciCtx, PsciState, VCpuArch, VMArch},
     },
     config::VMConfig,
     println,
@@ -16,12 +17,14 @@ use crate::{
 
 use super::{
     cpu::{mycpu, SyncToken},
+    emul::{EmulHandler, EmulMem, EmulReg},
+    ipc::{IPC, SHMEM_LIST},
     mem::PPages,
     mmu::{
         mem::AddrSpace,
         sections::{SEC_HYP_GLOBAL, SEC_HYP_PRIVATE, SEC_VM_ANY},
     },
-    types::{AsType, CpuID, CpuMap, IrqID, Paddr, VCpuID, Vaddr}, emul::{EmulMem, EmulReg, EmulHandler}, ipc::{IPC, SHMEM_LIST},
+    types::{AsType, CpuID, CpuMap, IrqID, Paddr, VCpuID, Vaddr},
 };
 
 pub struct VMMemRegion {
@@ -114,7 +117,6 @@ pub struct VM {
     pub ipcs: Vec<IPC>,
     pub lock: Mutex<()>,
 }
-
 
 pub fn myvcpu() -> &'static mut VCpu {
     unsafe { &mut *(mycpu().vcpu) }
@@ -296,6 +298,9 @@ impl VM {
                     .mem_alloc_map_dev(SEC_VM_ANY, dev.pa, dev.va, num_pages(dev.size))
                     .unwrap();
                 assert_eq!(va, dev.va.unwrap());
+            };
+            for intr in dev.interrupts.iter() {
+                self.interrupt_assign(*intr);
             }
         }
     }
@@ -312,7 +317,7 @@ impl VM {
             } else {
                 ipc.size
             };
-            
+
             *shmem.cpu_masters.lock() |= 1 << mycpu().id;
 
             let reg = VMMemRegion {
@@ -329,7 +334,7 @@ impl VM {
     pub fn emul_get_mem(&self, addr: Vaddr) -> Option<EmulHandler> {
         for emu in self.emul_mem_list.iter() {
             if addr >= emu.va_base && addr < emu.va_base + emu.size as u64 {
-                return Some(emu.handler)
+                return Some(emu.handler);
             }
         }
         None
@@ -341,6 +346,11 @@ impl VM {
 
     pub fn emul_add_reg(&mut self, emu: EmulReg) {
         self.emul_reg_list.push(emu);
+    }
+
+    fn interrupt_assign(&mut self, id: IrqID) {
+        // todo: check int_id conflict?
+        vgic_set_hw(self, id);
     }
 }
 

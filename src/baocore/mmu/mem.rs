@@ -20,7 +20,7 @@ use crate::{
         pagetable::{root_pt_addr, Pagetable},
         types::{AsSecID, AsType, Asid, ColorMap, MemFlags, Paddr, Vaddr, MAX_VA},
     },
-    util::{clear_memory, is_aligned, num_pages, BaoError, BaoResult}, println,
+    util::{clear_memory, is_aligned, num_pages, BaoError, BaoResult},
 };
 
 use super::sections::{mem_get_sections, SEC_HYP_PRIVATE, SEC_HYP_VM, SEC_HYP_GLOBAL};
@@ -349,7 +349,6 @@ impl AddrSpace {
             let pa = unsafe {*pte}.pa() + src_va % lvl_size as u64;
             let size = lvl_size.min(size_left);
             let n = size / PAGE_SIZE;
-            println!("mapping: pa={:#x?}, n={:#x?}", pa, n);
             self.mem_map(dst_va, Some(&PPages::new(pa, n)), n, PTE_HYP_FLAGS).unwrap();
             dst_va += size as u64;
             src_va += size as u64;

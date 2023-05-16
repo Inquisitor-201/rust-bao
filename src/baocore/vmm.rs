@@ -4,20 +4,21 @@ use alloc::vec::Vec;
 use spin::{Lazy, Mutex, RwLock};
 
 use crate::{
-    arch::aarch64::{defs::PAGE_SIZE, vmm::vmm_arch_init, vm::VMArch},
+    arch::aarch64::{defs::PAGE_SIZE, vm::VMArch, vmm::vmm_arch_init},
     config::{platform::qemu_aarch64_virt::linux_freertos::CONFIG, VMConfig},
     util::{align_up, num_pages},
 };
 
 use super::{
     cpu::{mycpu, SyncToken, CPU_SYNC_TOKEN},
+    ipc,
     mem::mem_alloc_page,
     mmu::{
         sections::SEC_HYP_VM,
         vmm::{vmm_get_vm_install_info, vmm_vm_install},
     },
     types::CpuMap,
-    vm::{vm_init, VCpu, VMAllocation, VMInstallInfo, VM}, ipc,
+    vm::{vm_init, VCpu, VMAllocation, VMInstallInfo, VM},
 };
 
 struct VMAssign {

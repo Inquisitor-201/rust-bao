@@ -2,39 +2,90 @@ use alloc::vec::Vec;
 use spin::{Mutex, RwLock};
 
 use crate::{
-    arch::aarch64::gic::{gic_is_priv, gicd_reg_mask, VGIC_ENABLE_MASK},
+    arch::aarch64::gic::{
+        gic_is_priv, gicd_reg_mask,
+        gicv3::{gicd_set_act, gicd_set_pend, gicd_set_prio, gicd_set_route},
+        VGIC_ENABLE_MASK,
+    },
     baocore::{
         emul::EmulAccess,
         types::{IrqID, VCpuID, Vaddr},
-        vm::{myvcpu, myvm},
+        vm::{myvcpu, myvm, VCpu, VM},
     },
-    println,
-    util::bit64_extract, debug,
+    debug, println,
+    util::bit64_extract,
 };
 
-use super::{gic_defs::{GICD_CTLR_ARE_NS_BIT, GIC_CPU_PRIV}, vgicv3::VGicR, GicVersion, GIC_VERSION};
+use super::{
+    gic_defs::{GICD_CTLR_ARE_NS_BIT, GICD_IROUTER_INV, GIC_CPU_PRIV, GIC_MAX_SGIS},
+    gic_is_sgi,
+    gicv3::gicd_set_enable,
+    vgicv3::{gich_get_hcr, gich_set_hcr, VGicR},
+    GicVersion, GIC_VERSION,
+};
 
 pub struct VGicIntr {
-    inner: RwLock<VGicIntrInner>
+    pub inner: RwLock<VGicIntrInner>,
 }
 
 impl VGicIntr {
-    pub fn new() -> Self {
+    pub fn new(id: IrqID) -> Self {
         Self {
-            inner: RwLock::new(VGicIntrInner::new())
+            inner: RwLock::new(VGicIntrInner::new(id)),
         }
     }
 
-    pub fn vgic_int_set_field(&mut self, _handlers: &VGicHandlerInfo, _data: u64) {
+    pub fn set_field(&mut self, handlers: &VGicHandlerInfo, data: u64, vcpu: *mut VCpu) {
         // todo: vgic_int_set_field
+        let mut intr_inner = self.inner.write();
+        if intr_inner.set_ownership(vcpu) {
+            // todo: vgic_remove_lr
+            let update_field = handlers.update_field.unwrap();
+            if update_field(vcpu, &mut intr_inner, data) && intr_inner.is_hw() {
+                let update_hw = handlers.update_hw.unwrap();
+                update_hw(vcpu, &mut intr_inner);
+            }
+        }
     }
 }
 
-pub struct VGicIntrInner {}
+pub struct VGicIntrInner {
+    pub owner: Option<*mut VCpu>,
+    pub enabled: bool,
+    pub pend: bool,
+    pub active: bool,
+    pub id: IrqID,
+    pub hw: bool,
+    pub prio: u8,
+    pub route: u64,
+}
 
 impl VGicIntrInner {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(id: IrqID) -> Self {
+        Self {
+            owner: None,
+            enabled: false,
+            pend: false,
+            active: false,
+            hw: false,
+            prio: u8::MAX, // lowest PRIO
+            route: GICD_IROUTER_INV,
+            id,
+        }
+    }
+
+    pub fn set_ownership(&mut self, vcpu: *mut VCpu) -> bool {
+        match &self.owner {
+            Some(owner) => *owner == vcpu,
+            None => {
+                self.owner = Some(vcpu);
+                true
+            }
+        }
+    }
+
+    pub fn is_hw(&mut self) -> bool {
+        self.id >= GIC_MAX_SGIS as _ && self.hw
     }
 }
 
@@ -43,7 +94,7 @@ pub struct VGicD {
     pub int_num: usize,
     pub ctlr: u32,
     pub typer: u32,
-    pub lock: Mutex<()>
+    pub lock: Mutex<()>,
 }
 
 impl VGicD {
@@ -76,8 +127,8 @@ impl VGicPriv {
             _curr_lrs: Vec::new(),
             interrupts: {
                 let mut intrs = Vec::with_capacity(GIC_CPU_PRIV);
-                for _ in 0..GIC_CPU_PRIV {
-                    intrs.push(VGicIntr::new());
+                for i in 0..GIC_CPU_PRIV {
+                    intrs.push(VGicIntr::new(i as _));
                 }
                 intrs
             },
@@ -92,31 +143,49 @@ pub fn vgicd_emul_handler(acc: &EmulAccess) -> bool {
             reg_access: vgicd_emul_misc_access,
             field_width: 0,
             regroup_base: 0,
+            read_field: None,
+            update_field: None,
+            update_hw: None,
         },
         GICD_REG_GROUP_IGROUPR => VGicHandlerInfo {
             reg_access: vgic_emul_razwi,
             field_width: 0,
             regroup_base: 0,
+            read_field: None,
+            update_field: None,
+            update_hw: None,
         },
         GICD_REG_GROUP_ISENABLER => VGicHandlerInfo {
             reg_access: vgic_emul_generic_access,
             field_width: 1,
             regroup_base: GICD_REG_ISENABLER_OFF,
+            read_field: Some(vgic_int_get_enable),
+            update_field: Some(vgic_int_set_enable),
+            update_hw: Some(vgic_int_enable_hw),
         },
         GICD_REG_GROUP_ICENABLER => VGicHandlerInfo {
             reg_access: vgic_emul_generic_access,
             field_width: 1,
             regroup_base: GICD_REG_ICENABLER_OFF,
+            read_field: Some(vgic_int_get_enable),
+            update_field: Some(vgic_int_clear_enable),
+            update_hw: Some(vgic_int_enable_hw),
         },
         GICD_REG_GROUP_ICPENDR => VGicHandlerInfo {
             reg_access: vgic_emul_generic_access,
             field_width: 1,
             regroup_base: GICD_REG_ICPENDR_OFF,
+            read_field: Some(vgic_int_get_pend),
+            update_field: Some(vgic_int_clear_pend),
+            update_hw: Some(vgic_int_state_hw),
         },
         GICD_REG_GROUP_ICACTIVER => VGicHandlerInfo {
             reg_access: vgic_emul_generic_access,
             field_width: 1,
             regroup_base: GICD_REG_ICACTIVER_OFF,
+            read_field: Some(vgic_int_get_act),
+            update_field: Some(vgic_int_clear_act),
+            update_hw: Some(vgic_int_state_hw),
         },
         _ => {
             let gicd_reg = gicd_reg_mask(acc.addr);
@@ -125,18 +194,30 @@ pub fn vgicd_emul_handler(acc: &EmulAccess) -> bool {
                     reg_access: vgic_emul_generic_access,
                     regroup_base: GICD_REG_IPRIORITYR_OFF,
                     field_width: 8,
+                    read_field: Some(vgic_int_get_prio),
+                    update_field: Some(vgic_int_set_prio),
+                    update_hw: Some(vgic_int_set_prio_hw),
                 }
-            } else if gicd_reg >= GICD_REG_ITARGETSR_OFF && gicd_reg < (GICD_REG_ITARGETSR_OFF + 0x400) {
+            } else if gicd_reg >= GICD_REG_ITARGETSR_OFF
+                && gicd_reg < (GICD_REG_ITARGETSR_OFF + 0x400)
+            {
                 VGicHandlerInfo {
                     reg_access: vgic_emul_razwi,
                     field_width: 0,
                     regroup_base: 0,
+                    read_field: None,
+                    update_field: None,
+                    update_hw: None,
                 }
-            } else if gicd_reg >= GICD_REG_IROUTER_OFF && gicd_reg < (GICD_REG_IROUTER_OFF + 0x2000) {
+            } else if gicd_reg >= GICD_REG_IROUTER_OFF && gicd_reg < (GICD_REG_IROUTER_OFF + 0x2000)
+            {
                 VGicHandlerInfo {
                     reg_access: vgic_emul_generic_access,
                     field_width: 64,
                     regroup_base: GICD_REG_IROUTER_OFF,
+                    read_field: Some(vgic_int_get_route),
+                    update_field: Some(vgic_int_set_route),
+                    update_hw: Some(vgic_int_set_route_hw),
                 }
             } else {
                 todo!("vgicd_emul_handler");
@@ -154,12 +235,12 @@ pub struct VGicHandlerInfo {
         fn(acc: &EmulAccess, handlers: &VGicHandlerInfo, gicr_access: bool, vgicr_id: VCpuID),
     pub regroup_base: Vaddr,
     pub field_width: u64,
+    pub read_field: Option<fn(*mut VCpu, &mut VGicIntrInner) -> u64>,
+    pub update_field: Option<fn(*mut VCpu, &mut VGicIntrInner, data: u64) -> bool>,
+    pub update_hw: Option<fn(*mut VCpu, &mut VGicIntrInner)>,
 }
 
-fn vgic_get_int(
-    int_id: IrqID,
-    vgicr_id: VCpuID,
-) -> Option<&'static mut VGicIntr> {
+fn vgic_get_int(int_id: IrqID, vgicr_id: VCpuID) -> Option<&'static mut VGicIntr> {
     if gic_is_priv(int_id) {
         Some(&mut myvm().get_vcpu_mut(vgicr_id).arch.vgic_priv.interrupts[int_id as usize])
     } else if int_id < myvm().arch.vgicd.int_num as _ {
@@ -193,25 +274,23 @@ pub fn vgicd_emul_misc_access(
     match reg {
         GICD_REG_INDEX_CTLR => {
             if acc.write {
-                // let prev_ctrl = inner.ctlr;
+                let prev_ctrl = vgicd.ctlr;
                 vgicd.ctlr = myvcpu().read_reg(acc.reg) as u32 & VGIC_ENABLE_MASK;
                 debug!("write gicd.ctlr: {:#x?}", vgicd.ctlr);
-                // if prev_ctrl ^ vgicd.CTLR != 0 {
-                //     vgic_update_enable(cpu().vcpu);
-                //     let msg = CpuMsg {
-                //         id: vgic_initPI_ID,
-                //         data: [
-                //             VGIC_UPDATE_ENABLE,
-                //             VGIC_MSG_DATA(cpu().vcpu.vm.id, 0, 0, 0, 0),
-                //         ],
-                //     };
-                //     vm_msg_broadcast(cpu().vcpu.vm, &msg);
-                // }
+
+                if prev_ctrl ^ vgicd.ctlr != 0 {
+                    vgic_update_enable();
+                    // let msg = CpuMsg {
+                    //     id: vgic_initPI_ID,
+                    //     data: [
+                    //         VGIC_UPDATE_ENABLE,
+                    //         VGIC_MSG_DATA(cpu().vcpu.vm.id, 0, 0, 0, 0),
+                    //     ],
+                    // };
+                    // vm_msg_broadcast(cpu().vcpu.vm, &msg);
+                }
             } else {
-                myvcpu().write_reg(
-                    acc.reg as u64,
-                    (vgicd.ctlr | GICD_CTLR_ARE_NS_BIT) as u64,
-                );
+                myvcpu().write_reg(acc.reg as u64, (vgicd.ctlr | GICD_CTLR_ARE_NS_BIT) as u64);
                 debug!("read gicd.ctlr: {:#x?}", vgicd.ctlr | GICD_CTLR_ARE_NS_BIT);
             }
         }
@@ -244,7 +323,11 @@ pub fn vgic_emul_generic_access(
     } else {
         0
     };
-    // let mask = (1u64 << field_width) - 1;
+    let mask = if field_width == 64 {
+        u64::MAX
+    } else {
+        (1u64 << field_width) - 1
+    };
     let valid_access = if let GicVersion::GicVersion2 = GIC_VERSION {
         true
     } else {
@@ -252,29 +335,173 @@ pub fn vgic_emul_generic_access(
     };
 
     if valid_access {
-        for i in 0..(acc.width * 8) / field_width {
+        for i in 0..(1.max((acc.width * 8) / field_width)) {
             let interrupt = vgic_get_int((first_int + i) as _, vgicr_id);
             if interrupt.is_none() {
                 break;
             }
             if acc.write {
                 let data = bit64_extract(val, i * field_width, field_width);
-                interrupt.unwrap().vgic_int_set_field(handlers, data);
+                interrupt.unwrap().set_field(handlers, data, myvcpu());
             } else {
-                val = 0;
-                // val |= (handlers.read_field(cpu().vcpu, interrupt.unwrap()) & mask)
-                //     << (i * field_width);
+                let read_field = handlers.read_field.unwrap();
+                let mut intr_inner = interrupt.unwrap().inner.write();
+                val |= (read_field(myvcpu(), &mut intr_inner) & mask) << (i * field_width);
             }
         }
     }
 
-    // if !acc.write {
-    //     vcpu_writereg(cpu().vcpu, acc.reg, val);
-    // }
+    if !acc.write {
+        myvcpu().write_reg(acc.reg, val);
+    }
+}
+
+fn vgic_update_enable() {
+    if myvm().arch.vgicd.ctlr & VGIC_ENABLE_MASK != 0 {
+        gich_set_hcr(gich_get_hcr() | 0x1);
+        debug!("GicH HCR enabled.");
+    } else {
+        gich_set_hcr(gich_get_hcr() & !0x1);
+        debug!("GicH HCR disabled.");
+    }
 }
 
 pub fn gic_maintenance_handler() {
     todo!("gic_maintenance_handler");
+}
+
+pub fn vgic_set_hw(vm: &mut VM, id: IrqID) {
+    if gic_is_sgi(id) {
+        return;
+    }
+    if gic_is_priv(id) {
+        for vcpuid in 0..vm.cpu_num {
+            let interrupt = vgic_get_int(id, vcpuid as _).unwrap();
+            interrupt.inner.write().hw = true;
+        }
+    } else {
+        let _lock = myvm().arch.vgicd.lock.lock();
+        let interrupt = vgic_get_int(id, myvcpu().id).unwrap();
+        interrupt.inner.write().hw = true;
+    }
+}
+
+// ----------------------------
+pub fn vgic_int_get_enable(_vcpu: *mut VCpu, intr: &mut VGicIntrInner) -> u64 {
+    debug!("get intr {} enable: {}.", intr.id, intr.enabled);
+    intr.enabled as _
+}
+
+pub fn vgic_int_set_enable(_vcpu: *mut VCpu, intr: &mut VGicIntrInner, data: u64) -> bool {
+    if data == 0 {
+        return false;
+    }
+    intr.enabled = true;
+    debug!("intr {} enabled.", intr.id);
+    true
+}
+
+pub fn vgic_int_clear_enable(_vcpu: *mut VCpu, intr: &mut VGicIntrInner, data: u64) -> bool {
+    if data == 0 {
+        return false;
+    }
+    intr.enabled = false;
+    debug!("intr {} disabled.", intr.id);
+    true
+}
+
+pub fn vgic_int_enable_hw(_vcpu: *mut VCpu, intr: &mut VGicIntrInner) {
+    if gic_is_priv(intr.id) {
+        todo!("gicr set enable");
+    } else {
+        gicd_set_enable(intr.id, intr.enabled);
+    }
+    debug!(
+        "intr {} (hardware) {}.",
+        intr.id,
+        if intr.enabled { "enabled" } else { "disabled" }
+    );
+}
+
+pub fn vgic_int_get_pend(_vcpu: *mut VCpu, intr: &mut VGicIntrInner) -> u64 {
+    debug!("get intr {} pend: {}.", intr.id, intr.pend);
+    intr.pend as _
+}
+
+pub fn vgic_int_clear_pend(_vcpu: *mut VCpu, intr: &mut VGicIntrInner, data: u64) -> bool {
+    if data == 0 {
+        return false;
+    }
+    intr.pend = false;
+    debug!("intr {} clear pend.", intr.id);
+    true
+}
+
+pub fn vgic_int_get_act(_vcpu: *mut VCpu, intr: &mut VGicIntrInner) -> u64 {
+    debug!("get intr {} act: {}.", intr.id, intr.active);
+    intr.active as _
+}
+
+pub fn vgic_int_clear_act(_vcpu: *mut VCpu, intr: &mut VGicIntrInner, data: u64) -> bool {
+    if data == 0 {
+        return false;
+    }
+    intr.active = false;
+    debug!("intr {} clear active.", intr.id);
+    true
+}
+
+pub fn vgic_int_state_hw(_vcpu: *mut VCpu, intr: &mut VGicIntrInner) {
+    if gic_is_priv(intr.id) {
+        todo!("gicr set state");
+    } else {
+        gicd_set_act(intr.id, intr.active);
+        gicd_set_pend(intr.id, intr.pend);
+    }
+    debug!(
+        "intr {} (hardware) set state: active = {}, pend = {}.",
+        intr.id, intr.active, intr.pend
+    );
+}
+
+pub fn vgic_int_get_prio(_vcpu: *mut VCpu, intr: &mut VGicIntrInner) -> u64 {
+    debug!("get intr {} prio: {:#x?}.", intr.id, intr.prio);
+    intr.prio as _
+}
+
+pub fn vgic_int_set_prio(_vcpu: *mut VCpu, intr: &mut VGicIntrInner, data: u64) -> bool {
+    intr.prio = data as _;
+    debug!("intr {} set prio -> {:#x?}.", intr.id, intr.prio);
+    true
+}
+
+pub fn vgic_int_set_prio_hw(_vcpu: *mut VCpu, intr: &mut VGicIntrInner) {
+    if gic_is_priv(intr.id) {
+        todo!("gicr set prio");
+    } else {
+        gicd_set_prio(intr.id, intr.prio);
+    }
+    debug!("intr {} (hardware) set prio", intr.id);
+}
+
+pub fn vgic_int_get_route(_vcpu: *mut VCpu, intr: &mut VGicIntrInner) -> u64 {
+    debug!("get intr {} route: {:#x?}.", intr.id, intr.route);
+    intr.route
+}
+
+pub fn vgic_int_set_route(_vcpu: *mut VCpu, intr: &mut VGicIntrInner, data: u64) -> bool {
+    intr.route = data;
+    debug!("intr {} set route -> {:#x?}.", intr.id, intr.route);
+    true
+}
+
+pub fn vgic_int_set_route_hw(_vcpu: *mut VCpu, intr: &mut VGicIntrInner) {
+    if gic_is_priv(intr.id) {
+        todo!("gicr set route");
+    } else {
+        gicd_set_route(intr.id, intr.route);
+    }
+    debug!("intr {} (hardware) set route", intr.id);
 }
 
 // --------------- GICD_REG_GROUPS ------------------

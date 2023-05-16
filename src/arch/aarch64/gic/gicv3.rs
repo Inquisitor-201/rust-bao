@@ -1,6 +1,10 @@
 #![allow(non_snake_case)]
+use spin::Mutex;
+
+use super::GIC;
 use super::{gic_defs::*, gicd::GicdHw};
 use crate::arch::aarch64::sysregs::*;
+use crate::baocore::types::IrqID;
 use crate::{
     baocore::{
         cpu::mycpu,
@@ -108,6 +112,8 @@ pub struct GicV3 {
     gicd_base: Vaddr,
     gicr_base: Vaddr,
     pub max_irqs: usize,
+    pub gicd_lock: Mutex<()>,
+    pub gicr_lock: Mutex<()>,
 }
 
 impl GicV3 {
@@ -116,6 +122,8 @@ impl GicV3 {
             gicd_base,
             gicr_base,
             max_irqs: 0,
+            gicd_lock: Mutex::new(()),
+            gicr_lock: Mutex::new(()),
         };
         gic.max_irqs = ((gic.gicd().TYPER as usize & 0b11111) + 1) * 32;
         gic
@@ -150,6 +158,36 @@ impl GicV3 {
         write_reg!(ich_hcr_el2, hcr as u64);
         write_reg!(icc_igrpen1_el1, ICC_IGRPEN_EL1_ENB_BIT);
     }
+}
+
+pub fn gicd_set_enable(id: IrqID, enabled: bool) {
+    let gic = unsafe { GIC.get_mut().unwrap() };
+    let _lock = gic.gicd_lock.lock();
+    unsafe { gic.gicd().set_enable(id, enabled) };
+}
+
+pub fn gicd_set_act(id: IrqID, act: bool) {
+    let gic = unsafe { GIC.get_mut().unwrap() };
+    let _lock = gic.gicd_lock.lock();
+    unsafe { gic.gicd().set_act(id, act) };
+}
+
+pub fn gicd_set_pend(id: IrqID, pend: bool) {
+    let gic = unsafe { GIC.get_mut().unwrap() };
+    let _lock = gic.gicd_lock.lock();
+    unsafe { gic.gicd().set_pend(id, pend) };
+}
+
+pub fn gicd_set_prio(id: IrqID, prio: u8) {
+    let gic = unsafe { GIC.get_mut().unwrap() };
+    let _lock = gic.gicd_lock.lock();
+    unsafe { gic.gicd().set_prio(id, prio) };
+}
+
+pub fn gicd_set_route(id: IrqID, route: u64) {
+    let gic = unsafe { GIC.get_mut().unwrap() };
+    let _lock = gic.gicd_lock.lock();
+    unsafe { gic.gicd().set_route(id, route) };
 }
 
 fn gich_num_lrs() -> u32 {

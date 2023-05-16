@@ -75,7 +75,16 @@ pub fn clear_memory(va: Vaddr, sz: usize) {
 }
 
 pub const fn bit64_extract(x: u64, off: u64, len: u64) -> u64 {
-    (x >> off) & ((1 << len) - 1)
+    let mask = if len < 64 { (1 << len) - 1 } else { u64::MAX };
+    (x >> off) & mask
+}
+
+pub const fn bit32_mask(off: u64, len: u64) -> u32 {
+    ((1 << len) - 1) << off
+}
+
+pub const fn bit64_mask(off: u64, len: u64) -> u64 {
+    ((1 << len) - 1) << off
 }
 
 pub const PAGE_OFFSET_MASK: usize = PAGE_SIZE - 1;

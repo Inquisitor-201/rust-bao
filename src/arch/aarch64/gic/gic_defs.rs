@@ -11,8 +11,16 @@ pub const fn gic_int_regs(nint: usize) -> usize {
     nint / (core::mem::size_of::<u32>() * 8)
 }
 
+pub const fn gic_int_mask(nint: usize) -> usize {
+    1 << (nint % (core::mem::size_of::<u32>() * 8))
+}
+
 pub const fn gic_prio_regs(nint: usize) -> usize {
     nint * GIC_PRIO_BITS / (core::mem::size_of::<u32>() * 8)
+}
+
+pub const fn gic_prio_off(nint: usize) -> usize {
+    nint * GIC_PRIO_BITS % (core::mem::size_of::<u32>() * 8)
 }
 
 pub const fn gic_target_regs(nint: usize) -> usize {

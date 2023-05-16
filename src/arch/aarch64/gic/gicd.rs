@@ -1,10 +1,12 @@
 #![allow(non_snake_case)]
 
+use crate::{baocore::types::IrqID, util::bit32_mask};
+
 use super::{
     gic_defs::{
-        gic_config_regs, gic_int_regs, gic_prio_regs, gic_sec_regs, gic_target_regs,
-        GICD_CTLR_ARE_NS_BIT, GICD_CTLR_ENA_BIT, GICD_IROUTER_INV, GIC_CPU_PRIV, GIC_MAX_INTERUPTS,
-        GIC_NUM_PRIVINT_REGS, GIC_NUM_SGI_REGS,
+        gic_config_regs, gic_int_mask, gic_int_regs, gic_prio_off, gic_prio_regs, gic_sec_regs,
+        gic_target_regs, GICD_CTLR_ARE_NS_BIT, GICD_CTLR_ENA_BIT, GICD_IROUTER_INV, GIC_CPU_PRIV,
+        GIC_MAX_INTERUPTS, GIC_NUM_PRIVINT_REGS, GIC_NUM_SGI_REGS, GIC_PRIO_BITS,
     },
     GicVersion, GIC_VERSION,
 };
@@ -26,25 +28,25 @@ pub struct GicdHw {
     pub pad4: [u8; 0x0058 - 0x0054],
     pub CLRSPI_SR: u32,
     pub pad9: [u8; 0x0080 - 0x005C],
-    pub IGROUPR: [u32; gic_int_regs(GIC_MAX_INTERUPTS)],      // 0x80
-    pub ISENABLER: [u32; gic_int_regs(GIC_MAX_INTERUPTS)],    // 0x100
-    pub ICENABLER: [u32; gic_int_regs(GIC_MAX_INTERUPTS)],    // 0x180
-    pub ISPENDR: [u32; gic_int_regs(GIC_MAX_INTERUPTS)],      // 0x200
-    pub ICPENDR: [u32; gic_int_regs(GIC_MAX_INTERUPTS)],      // 0x280
-    pub ISACTIVER: [u32; gic_int_regs(GIC_MAX_INTERUPTS)],    // 0x300
-    pub ICACTIVER: [u32; gic_int_regs(GIC_MAX_INTERUPTS)],    // 0x380
-    pub IPRIORITYR: [u32; gic_prio_regs(GIC_MAX_INTERUPTS)],  // 0x400
+    pub IGROUPR: [u32; gic_int_regs(GIC_MAX_INTERUPTS)], // 0x80
+    pub ISENABLER: [u32; gic_int_regs(GIC_MAX_INTERUPTS)], // 0x100
+    pub ICENABLER: [u32; gic_int_regs(GIC_MAX_INTERUPTS)], // 0x180
+    pub ISPENDR: [u32; gic_int_regs(GIC_MAX_INTERUPTS)], // 0x200
+    pub ICPENDR: [u32; gic_int_regs(GIC_MAX_INTERUPTS)], // 0x280
+    pub ISACTIVER: [u32; gic_int_regs(GIC_MAX_INTERUPTS)], // 0x300
+    pub ICACTIVER: [u32; gic_int_regs(GIC_MAX_INTERUPTS)], // 0x380
+    pub IPRIORITYR: [u32; gic_prio_regs(GIC_MAX_INTERUPTS)], // 0x400
     pub ITARGETSR: [u32; gic_target_regs(GIC_MAX_INTERUPTS)], // 0x800
-    pub ICFGR: [u32; gic_config_regs(GIC_MAX_INTERUPTS)],     // 0xc00
-    pub IGPRMODR: [u32; gic_int_regs(GIC_MAX_INTERUPTS)],     // 0xd00
+    pub ICFGR: [u32; gic_config_regs(GIC_MAX_INTERUPTS)], // 0xc00
+    pub IGPRMODR: [u32; gic_int_regs(GIC_MAX_INTERUPTS)], // 0xd00
     pub pad5: [u8; 0x0E00 - 0x0D80],
-    pub NSACR: [u32; gic_sec_regs(GIC_MAX_INTERUPTS)],        // 0xe00
+    pub NSACR: [u32; gic_sec_regs(GIC_MAX_INTERUPTS)], // 0xe00
     pub SGIR: u32,
     pub pad6: [u8; 0x0F10 - 0x0F04],
     pub CPENDSGIR: [u32; GIC_NUM_SGI_REGS],
     pub SPENDSGIR: [u32; GIC_NUM_SGI_REGS],
     pub pad7: [u8; 0x6000 - 0x0F30],
-    pub IROUTER: [u64; GIC_MAX_INTERUPTS],                    // 0x6000
+    pub IROUTER: [u64; GIC_MAX_INTERUPTS], // 0x6000
     pub pad8: [u8; 0xFFD0 - 0x8000],
     pub ID: [u32; (0x10000 - 0xFFD0) / core::mem::size_of::<u32>()],
 }
@@ -86,5 +88,51 @@ impl GicdHw {
                 self.CTLR |= GICD_CTLR_ARE_NS_BIT | GICD_CTLR_ENA_BIT;
             }
         }
+    }
+
+    pub fn set_enable(&mut self, id: IrqID, en: bool) {
+        let reg_ind = gic_int_regs(id as _);
+        let bit = gic_int_mask(id as _);
+
+        if en {
+            self.ISENABLER[reg_ind] = bit as _;
+        } else {
+            self.ICENABLER[reg_ind] = bit as _;
+        }
+    }
+
+    pub fn set_act(&mut self, id: IrqID, act: bool) {
+        let reg_ind = gic_int_regs(id as _);
+        let bit = gic_int_mask(id as _);
+
+        if act {
+            self.ISACTIVER[reg_ind] = bit as _;
+        } else {
+            self.ICACTIVER[reg_ind] = bit as _;
+        }
+    }
+
+    pub fn set_pend(&mut self, id: IrqID, pend: bool) {
+        let reg_ind = gic_int_regs(id as _);
+        let bit = gic_int_mask(id as _);
+
+        if pend {
+            self.ISPENDR[reg_ind] = bit as _;
+        } else {
+            self.ICPENDR[reg_ind] = bit as _;
+        }
+    }
+
+    pub fn set_prio(&mut self, id: IrqID, prio: u8) {
+        let reg_ind = gic_prio_regs(id as _);
+        let off = gic_prio_off(id as _);
+        let mask = bit32_mask(off as _, GIC_PRIO_BITS as _);
+
+        self.IPRIORITYR[reg_ind] =
+            (self.IPRIORITYR[reg_ind] & !mask) | (((prio as u32) << off) & mask);
+    }
+
+    pub fn set_route(&mut self, id: IrqID, route: u64) {
+        self.IROUTER[id as usize] = route;
     }
 }
