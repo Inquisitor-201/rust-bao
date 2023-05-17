@@ -1,7 +1,15 @@
 use aarch64::regs::{ELR_EL2, ESR_EL2, FAR_EL2};
 use tock_registers::interfaces::Readable;
 
-use crate::{baocore::{vm::{myvm, myvcpu}, emul::EmulAccess}, println, util::bit64_extract};
+use crate::{
+    arch::aarch64::{intr::interrupts_handle, gic::{gicc_iar, gicc_eoir, gicc_dir}},
+    baocore::{
+        emul::EmulAccess,
+        vm::{myvcpu, myvm}, intr::IntrHandleResult,
+    },
+    println,
+    util::bit64_extract, debug,
+};
 
 use super::sysregs::*;
 
@@ -20,14 +28,14 @@ fn aborts_data_lower(iss: u64, far: u64, il: u64) {
         addr,
         width: 1 << bit64_extract(iss, ESR_ISS_DA_SAS_OFF, ESR_ISS_DA_SAS_LEN),
         write: iss & ESR_ISS_DA_WnR_BIT != 0,
-        reg: bit64_extract(iss, ESR_ISS_DA_SRT_OFF, ESR_ISS_DA_SRT_LEN)
+        reg: bit64_extract(iss, ESR_ISS_DA_SRT_OFF, ESR_ISS_DA_SRT_LEN),
     };
-    println!("Access = {:#x?}", access);
+    // println!("Access = {:#x?}", access);
 
     let handler = myvm().emul_get_mem(addr).unwrap();
     if handler(&access) {
         let pc_step = 2 + 2 * il;
-        myvcpu().write_pc(myvcpu().read_pc() +  pc_step);
+        myvcpu().write_pc(myvcpu().read_pc() + pc_step);
     } else {
         println!("data abort emulation failed: access = {:#x?}", access);
     }
@@ -50,7 +58,7 @@ fn sync_exceptions_handler() {
         }
         Some(ESR_EL2::EC::Value::DataAbortLowerEL) => {
             println!(
-                "PageFault: ISS = {:#x}, \
+                "DA: ISS = {:#x}, \
                  GuestVaddr = {:#x?}, \
                  GuestPaddr = {:#x?}, \
                  fault_addr = {:#x?}, \
@@ -78,8 +86,17 @@ fn sync_exceptions_handler() {
 
 #[no_mangle]
 fn gic_handler() {
-    println!("gic_handler");
-    loop {}
+    let ack = gicc_iar();
+    let id = ack & ((1 << 24) - 1);
+    debug!("gic_handler: id = {}", id);
+
+    if id < 1020 {
+        let res = interrupts_handle(id as _);
+        gicc_eoir(ack as _);
+        if let IntrHandleResult::HandledByHyp = res {
+            gicc_dir(ack as _);
+        }
+    }
 }
 
 #[no_mangle]

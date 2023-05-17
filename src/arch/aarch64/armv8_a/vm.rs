@@ -7,11 +7,11 @@ use crate::{
     arch::aarch64::{
         armv8_a::fences::isb,
         sysregs::{VTTBR_VMID_MSK, VTTBR_VMID_OFF},
-        vm::VCpuArchProfileTrait,
+        vm::VCpuArchProfileTrait, gic::vgic::vgic_inject_hw,
     },
     baocore::{
         cpu::mycpu,
-        types::Paddr,
+        types::{Paddr, IrqID},
         vm::{VCpu, VM},
     },
 };
@@ -41,4 +41,8 @@ impl VCpuArchProfileTrait for VCpu {
             asm!("tlbi vmalls12e1is");
         }
     }
+}
+
+pub fn vcpu_arch_inject_hw_irq(vcpu: &'static mut VCpu, id: IrqID) {
+    vgic_inject_hw(vcpu, id);
 }

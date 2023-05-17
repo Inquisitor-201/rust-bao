@@ -13,13 +13,12 @@ use crate::{
     write_reg,
 };
 
-use self::{gicv3::GicV3, vgic::gic_maintenance_handler, gic_defs::{GIC_CPU_PRIV, GIC_MAX_SGIS}};
+use self::{vgic::gic_maintenance_handler, gic_defs::{GIC_CPU_PRIV, GIC_MAX_SGIS}};
 
 use super::{
     armv8_a::fences::isb,
     sysregs::{ICC_SRE_ENB_BIT, ICC_SRE_SRE_BIT},
 };
-use gicv3::gic_map_mmio;
 use spin::Once;
 
 pub enum GicVersion {
@@ -29,6 +28,7 @@ pub enum GicVersion {
 
 pub const GIC_VERSION: GicVersion = GicVersion::GicVersion3;
 pub use vgicv3::{vgic_init, gicd_reg_mask, VGIC_ENABLE_MASK};
+pub use gicv3::*;
 type Gic = GicV3;
 
 pub static mut GIC: Once<Gic> = Once::new();

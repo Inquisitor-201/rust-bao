@@ -78,6 +78,7 @@ impl VCpuArchTrait for VCpu {
         self.arch_profile_init(vm);
         // self.vgic_cpu_init();
     }
+
     fn arch_reset(&mut self, entry: Vaddr) {
         self.regs.spsr_el2 = SPSR_EL1h | SPSR_D | SPSR_A | SPSR_I | SPSR_F;
         self.write_pc(entry);
@@ -85,6 +86,7 @@ impl VCpuArchTrait for VCpu {
         write_reg!(sctlr_el1, SCTLR_RES1);
         write_reg!(pmcr_el0, 0u64);
     }
+
     fn arch_run(&mut self) {
         extern "C" {
             fn vcpu_arch_entry();

@@ -3,7 +3,7 @@ use spin::{Mutex, RwLock};
 
 use crate::{
     arch::aarch64::gic::{
-        gic_is_priv, gicd_reg_mask,
+        gic_is_priv, gicd_reg_mask, gich_get_hcr, gich_set_hcr,
         gicv3::{gicd_set_act, gicd_set_pend, gicd_set_prio, gicd_set_route},
         VGIC_ENABLE_MASK,
     },
@@ -12,15 +12,20 @@ use crate::{
         types::{IrqID, VCpuID, Vaddr},
         vm::{myvcpu, myvm, VCpu, VM},
     },
-    debug, println,
+    debug,
+    platform::{ArchPlatformTrait, PLATFORM},
+    read_reg,
     util::bit64_extract,
 };
 
 use super::{
-    gic_defs::{GICD_CTLR_ARE_NS_BIT, GICD_IROUTER_INV, GIC_CPU_PRIV, GIC_MAX_SGIS},
-    gic_is_sgi,
+    gic_defs::{
+        GICD_CTLR_ARE_NS_BIT, GICD_IROUTER_INV, GICH_LR_GRP_BIT, GICH_LR_HW_BIT, GIC_CPU_PRIV,
+        GIC_MAX_SGIS,
+    },
+    gic_is_sgi, gich_write_lr,
     gicv3::gicd_set_enable,
-    vgicv3::{gich_get_hcr, gich_set_hcr, VGicR},
+    vgicv3::VGicR,
     GicVersion, GIC_VERSION,
 };
 
@@ -58,6 +63,8 @@ pub struct VGicIntrInner {
     pub hw: bool,
     pub prio: u8,
     pub route: u64,
+    pub phys_route: u64,
+    pub in_lr: bool,
 }
 
 impl VGicIntrInner {
@@ -68,8 +75,10 @@ impl VGicIntrInner {
             pend: false,
             active: false,
             hw: false,
+            in_lr: false,
             prio: u8::MAX, // lowest PRIO
             route: GICD_IROUTER_INV,
+            phys_route: GICD_IROUTER_INV,
             id,
         }
     }
@@ -244,7 +253,7 @@ fn vgic_get_int(int_id: IrqID, vgicr_id: VCpuID) -> Option<&'static mut VGicIntr
     if gic_is_priv(int_id) {
         Some(&mut myvm().get_vcpu_mut(vgicr_id).arch.vgic_priv.interrupts[int_id as usize])
     } else if int_id < myvm().arch.vgicd.int_num as _ {
-        assert!(myvm().arch.vgicd.lock.is_locked());
+        // assert!(myvm().arch.vgicd.lock.is_locked());
         Some(&mut myvm().arch.vgicd.interrupts[int_id as usize - GIC_CPU_PRIV])
     } else {
         None
@@ -317,7 +326,6 @@ pub fn vgic_emul_generic_access(
 ) {
     let field_width = handlers.field_width;
     let first_int = (gicd_reg_mask(acc.addr) - handlers.regroup_base) * 8 / field_width;
-    println!("first_int = {:#x?}", first_int);
     let mut val = if acc.write {
         myvcpu().read_reg(acc.reg)
     } else {
@@ -485,23 +493,73 @@ pub fn vgic_int_set_prio_hw(_vcpu: *mut VCpu, intr: &mut VGicIntrInner) {
 }
 
 pub fn vgic_int_get_route(_vcpu: *mut VCpu, intr: &mut VGicIntrInner) -> u64 {
+    if gic_is_priv(intr.id) {
+        return 0;
+    }
     debug!("get intr {} route: {:#x?}.", intr.id, intr.route);
     intr.route
 }
 
 pub fn vgic_int_set_route(_vcpu: *mut VCpu, intr: &mut VGicIntrInner, data: u64) -> bool {
+    if gic_is_priv(intr.id) {
+        return false;
+    }
     intr.route = data;
+    intr.phys_route = PLATFORM.cpu_id_to_mpidr(myvm().get_vcpu(data & 0xff).phys_id);
     debug!("intr {} set route -> {:#x?}.", intr.id, intr.route);
     true
 }
 
 pub fn vgic_int_set_route_hw(_vcpu: *mut VCpu, intr: &mut VGicIntrInner) {
     if gic_is_priv(intr.id) {
-        todo!("gicr set route");
+        panic!("gicr: cannot set route");
     } else {
-        gicd_set_route(intr.id, intr.route);
+        gicd_set_route(intr.id, intr.phys_route);
     }
     debug!("intr {} (hardware) set route", intr.id);
+}
+
+// --------------------------------------------------
+
+pub fn vgic_write_lr(_vcpu: &'static mut VCpu, intr: &mut VGicIntrInner, lr_ind: u64) {
+    let mut lr = intr.id as u64  // vINTid
+        | ((intr.prio as u64) << 48)
+        | GICH_LR_GRP_BIT;
+    if intr.is_hw() {
+        lr |= GICH_LR_HW_BIT;
+        lr |= (intr.id as u64) << 32; // pINTid
+        lr |= (intr.pend as u64) << 62; // LR_STATE
+    }
+    debug!("gich_write_lr({}) -> {:#x?}", lr_ind, lr);
+    gich_write_lr(lr_ind as _, lr);
+}
+
+pub fn vgic_add_lr(vcpu: &'static mut VCpu, intr: &mut VGicIntrInner) -> bool {
+    if !intr.enabled || intr.in_lr {
+        return false;
+    }
+
+    let elrsr = read_reg!(ich_elrsr_el2);
+    let lr_ind = (0..16u64).find(|i| bit64_extract(elrsr, *i, 1) != 0);
+
+    if let Some(lr_ind) = lr_ind {
+        vgic_write_lr(vcpu, intr, lr_ind);
+        true
+    } else {
+        todo!("vgic_add_lr: no empty lr found");
+    }
+}
+
+pub fn vgic_inject_hw(vcpu: &'static mut VCpu, id: IrqID) {
+    let interrupt = vgic_get_int(id, vcpu.id).unwrap();
+
+    let mut intr = interrupt.inner.write();
+    intr.owner = Some(vcpu);
+    intr.pend = true;
+    intr.in_lr = false;
+    if !vgic_add_lr(vcpu, &mut intr) {
+        panic!("vgic: failed to inject hw")
+    }
 }
 
 // --------------- GICD_REG_GROUPS ------------------

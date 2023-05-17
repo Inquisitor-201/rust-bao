@@ -163,38 +163,46 @@ impl GicV3 {
 pub fn gicd_set_enable(id: IrqID, enabled: bool) {
     let gic = unsafe { GIC.get_mut().unwrap() };
     let _lock = gic.gicd_lock.lock();
-    unsafe { gic.gicd().set_enable(id, enabled) };
+    gic.gicd().set_enable(id, enabled);
 }
 
 pub fn gicd_set_act(id: IrqID, act: bool) {
     let gic = unsafe { GIC.get_mut().unwrap() };
     let _lock = gic.gicd_lock.lock();
-    unsafe { gic.gicd().set_act(id, act) };
+    gic.gicd().set_act(id, act);
 }
 
 pub fn gicd_set_pend(id: IrqID, pend: bool) {
     let gic = unsafe { GIC.get_mut().unwrap() };
     let _lock = gic.gicd_lock.lock();
-    unsafe { gic.gicd().set_pend(id, pend) };
+    gic.gicd().set_pend(id, pend);
 }
 
 pub fn gicd_set_prio(id: IrqID, prio: u8) {
     let gic = unsafe { GIC.get_mut().unwrap() };
     let _lock = gic.gicd_lock.lock();
-    unsafe { gic.gicd().set_prio(id, prio) };
+    gic.gicd().set_prio(id, prio);
 }
 
 pub fn gicd_set_route(id: IrqID, route: u64) {
     let gic = unsafe { GIC.get_mut().unwrap() };
     let _lock = gic.gicd_lock.lock();
-    unsafe { gic.gicd().set_route(id, route) };
+    gic.gicd().set_route(id, route);
 }
 
 fn gich_num_lrs() -> u32 {
     ((read_reg!(ich_vtr_el2) as u32 & GICH_VTR_MSK) >> GICH_VTR_OFF) + 1
 }
 
-fn gich_write_lr(i: u32, val: u64) {
+pub fn gich_get_hcr() -> u32 {
+    read_reg!(ich_hcr_el2) as u32
+}
+
+pub fn gich_set_hcr(hcr: u32) {
+    write_reg!(ich_hcr_el2, hcr as u64);
+}
+
+pub fn gich_write_lr(i: u32, val: u64) {
     match i {
         0 => write_reg!(ich_lr0_el2, val),
         1 => write_reg!(ich_lr1_el2, val),
@@ -214,4 +222,16 @@ fn gich_write_lr(i: u32, val: u64) {
         15 => write_reg!(ich_lr15_el2, val),
         _ => panic!("gich_write_lr: index out of range"),
     }
+}
+
+pub fn gicc_iar() -> u64 {
+    read_reg!(icc_iar1_el1)
+}
+
+pub fn gicc_eoir(eoir: u32) {
+    write_reg!(icc_eoir1_el1, eoir as u64)
+}
+
+pub fn gicc_dir(dir: u32) {
+    write_reg!(icc_dir_el1, dir as u64)
 }

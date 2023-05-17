@@ -7,9 +7,10 @@ use crate::{
         gic::vgic::{
             vgic_emul_generic_access, vgic_emul_razwi, vgic_int_clear_act, vgic_int_clear_enable,
             vgic_int_clear_pend, vgic_int_enable_hw, vgic_int_get_act, vgic_int_get_enable,
-            vgic_int_get_pend, vgic_int_state_hw, VGicHandlerInfo, GICD_REG_ICACTIVER_OFF,
+            vgic_int_get_pend, vgic_int_get_prio, vgic_int_set_enable, vgic_int_set_prio,
+            vgic_int_set_prio_hw, vgic_int_state_hw, VGicHandlerInfo, GICD_REG_ICACTIVER_OFF,
             GICD_REG_ICENABLER_OFF, GICD_REG_ICPENDR_OFF, GICD_REG_IPRIORITYR_OFF,
-            GICD_REG_ISENABLER_OFF, vgic_int_get_prio, vgic_int_set_prio, vgic_int_set_prio_hw, vgic_int_set_enable,
+            GICD_REG_ISENABLER_OFF,
         },
     },
     baocore::{
@@ -17,9 +18,7 @@ use crate::{
         types::Vaddr,
         vm::{myvm, VM},
     },
-    println, read_reg,
     util::align_up,
-    write_reg,
 };
 
 use super::{
@@ -80,7 +79,6 @@ pub fn vgic_init(vm: &mut VM, vgic_dscrp: &VGicDscr) {
 
 fn vgicr_emul_handler(acc: &EmulAccess) -> bool {
     let gicr_reg = gicr_reg_mask(acc.addr);
-    println!("gicr_reg = {:#x?}", gicr_reg);
     let handler_info = match gicr_reg {
         GICR_REG_WAKER_OFF | GICR_REG_IGROUPR0_OFF => VGicHandlerInfo {
             reg_access: vgic_emul_razwi,
@@ -145,14 +143,6 @@ fn vgicr_emul_handler(acc: &EmulAccess) -> bool {
     let _gicr_mutex = vcpu.arch.vgic_priv.vgicr.lock.lock();
     (handler_info.reg_access)(acc, &handler_info, true, vgcir_id);
     true
-}
-
-pub fn gich_get_hcr() -> u32 {
-    read_reg!(ich_hcr_el2) as u32
-}
-
-pub fn gich_set_hcr(hcr: u32) {
-    write_reg!(ich_hcr_el2, hcr as u64);
 }
 
 pub struct VGicR {

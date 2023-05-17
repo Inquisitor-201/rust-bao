@@ -34,3 +34,5 @@ upd: 2023-5-16
 2. vgic_check_reg_alignment
 3. vgic_remove_lr
 4. todo: reuse VGicHandlerInfo
+5. todo: vm interrupts set
+6. todo: vgic_write_lr: pend, act
