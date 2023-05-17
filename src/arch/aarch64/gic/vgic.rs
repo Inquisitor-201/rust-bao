@@ -3,11 +3,13 @@ use spin::{Mutex, RwLock};
 
 use crate::{
     arch::aarch64::gic::{
-        gic_is_priv, gicd_reg_mask, gich_get_hcr, gich_set_hcr,
+        gic_is_priv, gicd_reg_mask, gich_get_hcr, gich_set_hcr, gicr_set_act, gicr_set_enable,
+        gicr_set_pend,
         gicv3::{gicd_set_act, gicd_set_pend, gicd_set_prio, gicd_set_route},
-        VGIC_ENABLE_MASK,
+        VGIC_ENABLE_MASK, gicr_set_prio,
     },
     baocore::{
+        cpu::mycpu,
         emul::EmulAccess,
         types::{IrqID, VCpuID, Vaddr},
         vm::{myvcpu, myvm, VCpu, VM},
@@ -420,7 +422,7 @@ pub fn vgic_int_clear_enable(_vcpu: *mut VCpu, intr: &mut VGicIntrInner, data: u
 
 pub fn vgic_int_enable_hw(_vcpu: *mut VCpu, intr: &mut VGicIntrInner) {
     if gic_is_priv(intr.id) {
-        todo!("gicr set enable");
+        gicr_set_enable(intr.id, intr.enabled, mycpu().id);
     } else {
         gicd_set_enable(intr.id, intr.enabled);
     }
@@ -461,7 +463,8 @@ pub fn vgic_int_clear_act(_vcpu: *mut VCpu, intr: &mut VGicIntrInner, data: u64)
 
 pub fn vgic_int_state_hw(_vcpu: *mut VCpu, intr: &mut VGicIntrInner) {
     if gic_is_priv(intr.id) {
-        todo!("gicr set state");
+        gicr_set_act(intr.id, intr.active, mycpu().id);
+        gicr_set_pend(intr.id, intr.pend, mycpu().id);
     } else {
         gicd_set_act(intr.id, intr.active);
         gicd_set_pend(intr.id, intr.pend);
@@ -485,7 +488,7 @@ pub fn vgic_int_set_prio(_vcpu: *mut VCpu, intr: &mut VGicIntrInner, data: u64) 
 
 pub fn vgic_int_set_prio_hw(_vcpu: *mut VCpu, intr: &mut VGicIntrInner) {
     if gic_is_priv(intr.id) {
-        todo!("gicr set prio");
+        gicr_set_prio(intr.id, intr.prio, mycpu().id);
     } else {
         gicd_set_prio(intr.id, intr.prio);
     }
@@ -530,7 +533,7 @@ pub fn vgic_write_lr(_vcpu: &'static mut VCpu, intr: &mut VGicIntrInner, lr_ind:
         lr |= (intr.id as u64) << 32; // pINTid
         lr |= (intr.pend as u64) << 62; // LR_STATE
     }
-    debug!("gich_write_lr({}) -> {:#x?}", lr_ind, lr);
+    // debug!("gich_write_lr({}) -> {:#x?}", lr_ind, lr);
     gich_write_lr(lr_ind as _, lr);
 }
 

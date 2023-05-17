@@ -50,13 +50,13 @@ pub static CONFIG: Lazy<RwLock<Config>> = Lazy::new(|| {
                     size: 0x10000,
                     interrupts: vec![33],
                 },
-                // VMDeviceRegion {
-                //     /* Arch timer interrupt */
-                //     pa: 0,
-                //     va: 0,
-                //     size: 0,
-                //     interrupts: vec![27],
-                // },
+                VMDeviceRegion {
+                    /* Arch timer interrupt */
+                    pa: 0,
+                    va: None,
+                    size: 0,
+                    interrupts: vec![27],
+                },
                 // VMDeviceRegion {
                 //     /* virtio devices */
                 //     pa: 0xa003000,

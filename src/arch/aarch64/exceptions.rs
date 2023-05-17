@@ -88,7 +88,7 @@ fn sync_exceptions_handler() {
 fn gic_handler() {
     let ack = gicc_iar();
     let id = ack & ((1 << 24) - 1);
-    debug!("gic_handler: id = {}", id);
+    // debug!("gic_handler: id = {}", id);
 
     if id < 1020 {
         let res = interrupts_handle(id as _);

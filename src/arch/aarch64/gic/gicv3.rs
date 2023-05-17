@@ -5,6 +5,7 @@ use super::GIC;
 use super::{gic_defs::*, gicd::GicdHw};
 use crate::arch::aarch64::sysregs::*;
 use crate::baocore::types::IrqID;
+use crate::util::bit32_mask;
 use crate::{
     baocore::{
         cpu::mycpu,
@@ -81,6 +82,44 @@ impl GicrHw {
             self.IPRIORITYR[i] = u32::MAX;
         }
     }
+    pub fn set_enable(&mut self, id: IrqID, en: bool) {
+        let bit = gic_int_mask(id as _);
+
+        if en {
+            self.ISENABLER0 = bit as _;
+        } else {
+            self.ICENABLER0 = bit as _;
+        }
+    }
+
+    pub fn set_act(&mut self, id: IrqID, act: bool) {
+        let bit = gic_int_mask(id as _);
+
+        if act {
+            self.ISACTIVER0 = bit as _;
+        } else {
+            self.ICACTIVER0 = bit as _;
+        }
+    }
+
+    pub fn set_pend(&mut self, id: IrqID, pend: bool) {
+        let bit = gic_int_mask(id as _);
+
+        if pend {
+            self.ISPENDR0 = bit as _;
+        } else {
+            self.ICPENDR0 = bit as _;
+        }
+    }
+
+    pub fn set_prio(&mut self, id: IrqID, prio: u8) {
+        let reg_ind = gic_prio_regs(id as _);
+        let off = gic_prio_off(id as _);
+        let mask = bit32_mask(off as _, GIC_PRIO_BITS as _);
+
+        self.IPRIORITYR[reg_ind] =
+            (self.IPRIORITYR[reg_ind] & !mask) | (((prio as u32) << off) & mask);
+    }
 }
 
 #[repr(C)]
@@ -143,6 +182,7 @@ impl GicV3 {
     }
 
     fn gicr(&self, index: usize) -> &mut GicrHw {
+        assert!(index < PLATFORM.cpu_num);
         unsafe { &mut *((self.gicr_base as *mut GicrHw).add(index)) }
     }
 
@@ -188,6 +228,32 @@ pub fn gicd_set_route(id: IrqID, route: u64) {
     let gic = unsafe { GIC.get_mut().unwrap() };
     let _lock = gic.gicd_lock.lock();
     gic.gicd().set_route(id, route);
+}
+
+// ---------------------------------------------------------------
+
+pub fn gicr_set_enable(id: IrqID, enabled: bool, gicr_id: CpuID) {
+    let gic = unsafe { GIC.get_mut().unwrap() };
+    let _lock = gic.gicr_lock.lock();
+    gic.gicr(gicr_id as _).set_enable(id, enabled);
+}
+
+pub fn gicr_set_act(id: IrqID, act: bool, gicr_id: CpuID) {
+    let gic = unsafe { GIC.get_mut().unwrap() };
+    let _lock = gic.gicr_lock.lock();
+    gic.gicr(gicr_id as _).set_act(id, act);
+}
+
+pub fn gicr_set_pend(id: IrqID, pend: bool, gicr_id: CpuID) {
+    let gic = unsafe { GIC.get_mut().unwrap() };
+    let _lock = gic.gicr_lock.lock();
+    gic.gicr(gicr_id as _).set_pend(id, pend);
+}
+
+pub fn gicr_set_prio(id: IrqID, prio: u8, gicr_id: CpuID) {
+    let gic = unsafe { GIC.get_mut().unwrap() };
+    let _lock = gic.gicr_lock.lock();
+    gic.gicr(gicr_id as _).set_prio(id, prio);
 }
 
 fn gich_num_lrs() -> u32 {
