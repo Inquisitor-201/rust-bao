@@ -2,13 +2,17 @@ use aarch64::regs::{ELR_EL2, ESR_EL2, FAR_EL2};
 use tock_registers::interfaces::Readable;
 
 use crate::{
-    arch::aarch64::{intr::interrupts_handle, gic::{gicc_iar, gicc_eoir, gicc_dir}},
+    arch::aarch64::{
+        gic::{gicc_dir, gicc_eoir, gicc_iar},
+        intr::interrupts_handle,
+    },
     baocore::{
         emul::EmulAccess,
-        vm::{myvcpu, myvm}, intr::IntrHandleResult,
+        intr::IntrHandleResult,
+        vm::{myvcpu, myvm},
     },
-    println,
-    util::bit64_extract, debug,
+    debug, println,
+    util::bit64_extract,
 };
 
 use super::sysregs::*;
@@ -30,7 +34,7 @@ fn aborts_data_lower(iss: u64, far: u64, il: u64) {
         write: iss & ESR_ISS_DA_WnR_BIT != 0,
         reg: bit64_extract(iss, ESR_ISS_DA_SRT_OFF, ESR_ISS_DA_SRT_LEN),
     };
-    // println!("Access = {:#x?}", access);
+    println!("Access = {:#x?}", access);
 
     let handler = myvm().emul_get_mem(addr).unwrap();
     if handler(&access) {
@@ -39,6 +43,44 @@ fn aborts_data_lower(iss: u64, far: u64, il: u64) {
     } else {
         println!("data abort emulation failed: access = {:#x?}", access);
     }
+}
+
+const PSCI_VERSION: u64 = 0x84000000;
+const PSCI_MIG_INFO_TYPE: u64 = 0x84000006;
+const PSCI_CPU_SUSPEND_SMC64: u64 = 0xc4000001;
+const PSCI_CPU_ON_SMC64: u64 = 0xc4000003;
+
+fn psci_smc_handler(fid: u64, _arg1: u64, _arg2: u64, _arg3: u64) -> u64 {
+    match fid {
+        PSCI_VERSION => 2,       // PSCI_VERSION_0_2
+        PSCI_MIG_INFO_TYPE => 2, // PSCI_TOS_NOT_PRESENT_MP
+        PSCI_CPU_SUSPEND_SMC64 => 1,
+        PSCI_CPU_ON_SMC64 => 1,
+        _ => {
+            panic!("unknown psci call");
+        }
+    }
+}
+
+pub fn smc_handler() {
+    let fid = myvcpu().read_reg(0);
+    let arg1 = myvcpu().read_reg(1);
+    let arg2 = myvcpu().read_reg(2);
+    let arg3 = myvcpu().read_reg(3);
+    debug!(
+        "smc: fid = {:#x?}, arg1 = {:#x?}, arg2 = {:#x?}, arg3 = {:#x?}",
+        fid, arg1, arg2, arg3
+    );
+
+    if fid & 0xff000000 == 0x84000000 || fid & 0xff000000 == 0xc4000000 {
+        // is SMC_HANDLER
+        let ret = psci_smc_handler(fid, arg1, arg2, arg3);
+        myvcpu().write_reg(0, ret);
+    } else {
+        panic!("not a psci call {:#x?}", fid);
+    }
+    myvcpu().write_pc(myvcpu().read_pc() + 4);
+    // todo!("fid = {:#x?}", fid);
 }
 
 #[no_mangle]
@@ -69,7 +111,11 @@ fn sync_exceptions_handler() {
                 ipa_fault_addr,
                 ELR_EL2.get(),
             );
-            aborts_data_lower(iss, far, il);
+            aborts_data_lower(iss, ipa_fault_addr, il);
+        }
+        Some(ESR_EL2::EC::Value::SMC64) => {
+            println!("SMC64: instruction_addr = {:#x?}", ELR_EL2.get());
+            smc_handler();
         }
         _ => {
             panic!(

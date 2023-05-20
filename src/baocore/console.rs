@@ -81,6 +81,6 @@ macro_rules! println {
 macro_rules! debug {
     () => { $crate::console::println!("") };
     ($($arg:tt)+) => {{
-        $crate::baocore::console::print(format_args!("\x1B[34m[debug] {}\n\x1B[0m", format_args!($($arg)+)));
+        $crate::baocore::console::print(format_args!("\x1B[34m[Cpu {}] {}\n\x1B[0m", crate::mycpu().id, format_args!($($arg)+)));
     }}
 }

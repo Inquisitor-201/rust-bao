@@ -4,7 +4,7 @@ use crate::{
     arch::aarch64::sysregs::*,
     baocore::{
         types::{Paddr, VCpuID, Vaddr},
-        vm::{VCpu, VCpuArchTrait, VMArchTrait, VM},
+        vm::{VCpu, VCpuArchTrait, VMArchTrait, VM}, cpu::mycpu,
     },
     config::VMConfig,
     write_reg,
@@ -13,9 +13,11 @@ use crate::{
 use super::gic::{vgic::{VGicD, VGicPriv}, vgic_init};
 
 impl VMArchTrait for VM {
-    fn arch_init(&mut self, config: &VMConfig) {
+    fn arch_init(&mut self, config: &VMConfig, master: bool) {
         // TODO: Vgic init
-        vgic_init(self, &config.vm_platform.arch.gic);
+        if master {
+            vgic_init(self, &config.vm_platform.arch.gic);
+        }
     }
 }
 

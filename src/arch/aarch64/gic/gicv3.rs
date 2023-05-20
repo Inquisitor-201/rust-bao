@@ -230,6 +230,17 @@ pub fn gicd_set_route(id: IrqID, route: u64) {
     gic.gicd().set_route(id, route);
 }
 
+pub fn gicd_get_pidr(addr: u64) -> u32 {
+    let gic = unsafe { GIC.get_mut().unwrap() };
+    let _lock = gic.gicd_lock.lock();
+    gic.gicd().ID[((addr as usize & 0xffff) - 0xffd0) / 4]
+}
+
+pub fn gicd_get_iidr() -> u32 {
+    let gic = unsafe { GIC.get_mut().unwrap() };
+    let _lock = gic.gicd_lock.lock();
+    gic.gicd().IIDR
+}
 // ---------------------------------------------------------------
 
 pub fn gicr_set_enable(id: IrqID, enabled: bool, gicr_id: CpuID) {
@@ -254,6 +265,12 @@ pub fn gicr_set_prio(id: IrqID, prio: u8, gicr_id: CpuID) {
     let gic = unsafe { GIC.get_mut().unwrap() };
     let _lock = gic.gicr_lock.lock();
     gic.gicr(gicr_id as _).set_prio(id, prio);
+}
+
+pub fn gicr_get_pidr(addr: u64) -> u32 {
+    let gic = unsafe { GIC.get_mut().unwrap() };
+    let _lock = gic.gicr_lock.lock();
+    gic.gicr(0).ID[((addr as usize & 0xffff) - 0xffd0) / 4]
 }
 
 fn gich_num_lrs() -> u32 {

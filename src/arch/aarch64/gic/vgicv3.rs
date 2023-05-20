@@ -15,15 +15,17 @@ use crate::{
     },
     baocore::{
         emul::{EmulAccess, EmulMem},
-        types::Vaddr,
-        vm::{myvm, VM},
+        types::{VCpuID, Vaddr},
+        vm::{myvcpu, myvm, VM},
     },
-    util::align_up,
+    debug,
+    util::{align_up, bit64_mask},
 };
 
 use super::{
     gic_defs::GIC_CPU_PRIV,
     gicd::GicdHw,
+    gicd_get_iidr, gicr_get_pidr,
     gicv3::GicrHw,
     vgic::{vgicd_emul_handler, VGicIntr},
     GIC,
@@ -48,6 +50,7 @@ pub fn vgic_init(vm: &mut VM, vgic_dscrp: &VGicDscr) {
     vm.arch.vgicd.typer = ((vm.arch.vgicd.int_num as u32 / 32 - 1) & 0b11111) // ITLN
         | ((vm.cpu_num as u32 - 1) << 5)        // CPU_NUM
         | ((10 - 1) << 19); // TYPER_IDBITS
+    vm.arch.vgicd.iidr = gicd_get_iidr();
 
     for i in 0..vm.arch.vgicd.int_num {
         let intr = VGicIntr::new((i + GIC_CPU_PRIV) as _);
@@ -69,6 +72,15 @@ pub fn vgic_init(vm: &mut VM, vgic_dscrp: &VGicDscr) {
     };
     vm.emul_add_mem(vgicd_emul);
 
+    for vcpu_id in 0..myvm().cpu_num {
+        let vcpu = vm.get_vcpu_mut(vcpu_id as _);
+
+        let mut typer = vcpu.id << 8;
+        typer |= (vcpu.arch.vmpidr & 0xffff) << 32;
+        typer |= ((vcpu.id as usize == myvm().cpu_num - 1) as u64) << 4;
+        vcpu.arch.vgic_priv.vgicr.typer = typer;
+    }
+
     let vgicr_emul = EmulMem {
         va_base: vgic_dscrp.gicr_addr,
         size: align_up(core::mem::size_of::<GicrHw>(), PAGE_SIZE) * vm.cpu_num,
@@ -80,8 +92,16 @@ pub fn vgic_init(vm: &mut VM, vgic_dscrp: &VGicDscr) {
 fn vgicr_emul_handler(acc: &EmulAccess) -> bool {
     let gicr_reg = gicr_reg_mask(acc.addr);
     let handler_info = match gicr_reg {
-        GICR_REG_WAKER_OFF | GICR_REG_IGROUPR0_OFF => VGicHandlerInfo {
+        0 | GICR_REG_WAKER_OFF | GICR_REG_IGROUPR0_OFF | 0x10c00 | 0x10c04 => VGicHandlerInfo {
             reg_access: vgic_emul_razwi,
+            regroup_base: 0,
+            field_width: 0,
+            read_field: None,
+            update_field: None,
+            update_hw: None,
+        },
+        GICR_REG_TYPER_OFF => VGicHandlerInfo {
+            reg_access: vgicr_emul_typer_access,
             regroup_base: 0,
             field_width: 0,
             read_field: None,
@@ -130,6 +150,15 @@ fn vgicr_emul_handler(acc: &EmulAccess) -> bool {
                     update_field: Some(vgic_int_set_prio),
                     update_hw: Some(vgic_int_set_prio_hw),
                 }
+            } else if gicr_reg >= GICR_REG_ID_OFF && gicr_reg < 0xfffc {
+                VGicHandlerInfo {
+                    reg_access: vgicr_emul_pidr_access,
+                    field_width: 0,
+                    regroup_base: 0,
+                    read_field: None,
+                    update_field: None,
+                    update_hw: None,
+                }
             } else {
                 todo!("vgicr_emul_handler");
             }
@@ -145,6 +174,41 @@ fn vgicr_emul_handler(acc: &EmulAccess) -> bool {
     true
 }
 
+fn vgicr_emul_pidr_access(
+    acc: &EmulAccess,
+    _handlers: &VGicHandlerInfo,
+    _gicr_access: bool,
+    _vgicr_id: VCpuID,
+) {
+    if !acc.write {
+        debug!("read gicr.pidr: {:#x?}", gicr_get_pidr(acc.addr));
+        myvcpu().write_reg(acc.reg, gicr_get_pidr(acc.addr) as _);
+    }
+}
+
+fn vgicr_emul_typer_access(
+    acc: &EmulAccess,
+    _handlers: &VGicHandlerInfo,
+    _gicr_access: bool,
+    vgicr_id: VCpuID,
+) {
+    let word_access = acc.width == 4;
+    let top_access = word_access && (acc.addr & 0x4 != 0);
+
+    if !acc.write {
+        let vcpu = myvm().get_vcpu_mut(vgicr_id);
+        let typer0 = vcpu.arch.vgic_priv.vgicr.typer;
+        let typer = if top_access {
+            typer0 >> 32
+        } else {
+            typer0 & bit64_mask(0, 32)
+        };
+        myvcpu().write_reg(acc.reg, typer);
+        debug!("read gicr({}).typer {:#x?}", vgicr_id, typer0);
+    }
+}
+// ----------------------------------
+
 pub struct VGicR {
     pub lock: Mutex<()>,
     pub typer: u64,
@@ -156,6 +220,7 @@ pub const VGIC_ENABLE_MASK: u32 = 0x2;
 
 // ------------ GICR REGS ------------------
 
+const GICR_REG_TYPER_OFF: u64 = 0x8;
 const GICR_REG_WAKER_OFF: u64 = 0x14;
 const GICR_REG_IGROUPR0_OFF: u64 = 0x10080;
 const GICR_REG_ISENABLER0_OFF: u64 = 0x10100;
@@ -163,3 +228,4 @@ const GICR_REG_ICENABLER0_OFF: u64 = 0x10180;
 const GICR_REG_ICPENDR0_OFF: u64 = 0x10280;
 const GICR_REG_ICACTIVER0_OFF: u64 = 0x10380;
 const GICR_REG_IPRIORITYR_OFF: u64 = 0x10400;
+const GICR_REG_ID_OFF: u64 = 0x0ffd0;

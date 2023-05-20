@@ -4,9 +4,9 @@ use spin::{Mutex, RwLock};
 use crate::{
     arch::aarch64::gic::{
         gic_is_priv, gicd_reg_mask, gich_get_hcr, gich_set_hcr, gicr_set_act, gicr_set_enable,
-        gicr_set_pend,
+        gicr_set_pend, gicr_set_prio,
         gicv3::{gicd_set_act, gicd_set_pend, gicd_set_prio, gicd_set_route},
-        VGIC_ENABLE_MASK, gicr_set_prio,
+        VGIC_ENABLE_MASK,
     },
     baocore::{
         cpu::mycpu,
@@ -28,7 +28,7 @@ use super::{
     gic_is_sgi, gich_write_lr,
     gicv3::gicd_set_enable,
     vgicv3::VGicR,
-    GicVersion, GIC_VERSION,
+    GicVersion, GIC_VERSION, gicd_get_pidr,
 };
 
 pub struct VGicIntr {
@@ -105,6 +105,7 @@ pub struct VGicD {
     pub int_num: usize,
     pub ctlr: u32,
     pub typer: u32,
+    pub iidr: u32,
     pub lock: Mutex<()>,
 }
 
@@ -115,6 +116,7 @@ impl VGicD {
             int_num: 0,
             ctlr: 0,
             typer: 0,
+            iidr: 0,
             lock: Mutex::new(()),
         }
     }
@@ -198,6 +200,14 @@ pub fn vgicd_emul_handler(acc: &EmulAccess) -> bool {
             update_field: Some(vgic_int_clear_act),
             update_hw: Some(vgic_int_state_hw),
         },
+        GICD_REG_GROUP_ICFGR => VGicHandlerInfo {
+            reg_access: vgic_emul_razwi,
+            field_width: 0,
+            regroup_base: 0,
+            read_field: None,
+            update_field: None,
+            update_hw: None,
+        },
         _ => {
             let gicd_reg = gicd_reg_mask(acc.addr);
             if gicd_reg >= GICD_REG_IPRIORITYR_OFF && gicd_reg < (GICD_REG_IPRIORITYR_OFF + 0x400) {
@@ -229,6 +239,15 @@ pub fn vgicd_emul_handler(acc: &EmulAccess) -> bool {
                     read_field: Some(vgic_int_get_route),
                     update_field: Some(vgic_int_set_route),
                     update_hw: Some(vgic_int_set_route_hw),
+                }
+            } else if gicd_reg >= GICD_REG_ID_OFF {
+                VGicHandlerInfo {
+                    reg_access: vgicd_emul_pidr_access,
+                    field_width: 0,
+                    regroup_base: 0,
+                    read_field: None,
+                    update_field: None,
+                    update_hw: None,
                 }
             } else {
                 todo!("vgicd_emul_handler");
@@ -311,12 +330,15 @@ pub fn vgicd_emul_misc_access(
                 debug!("read gicd.typer: {:#x?}", vgicd.typer);
             }
         }
-        // GICD_REG_IND(IIDR) => {
-        //     if !acc.write {
-        //         vcpu_writereg(cpu().vcpu, acc.reg as u64, vgicd.IIDR);
-        //     }
-        // }
-        _ => todo!(),
+        GICD_REG_INDEX_IIDR => {
+            if !acc.write {
+                myvcpu().write_reg(acc.reg, vgicd.iidr as _);
+                debug!("read gicd.iidr: {:#x?}", vgicd.iidr);
+            }
+        }
+        _ => {
+            debug!("unknown gicd access {:#x?} (vgicd_emul_misc_access)", acc.addr);
+        },
     }
 }
 
@@ -363,6 +385,18 @@ pub fn vgic_emul_generic_access(
 
     if !acc.write {
         myvcpu().write_reg(acc.reg, val);
+    }
+}
+
+pub fn vgicd_emul_pidr_access(
+    acc: &EmulAccess,
+    _handlers: &VGicHandlerInfo,
+    _gicr_access: bool,
+    _vgicr_id: VCpuID,
+) {
+    if !acc.write {
+        debug!("read gicd.pidr: {:#x?}", gicd_get_pidr(acc.addr));
+        myvcpu().write_reg(acc.reg, gicd_get_pidr(acc.addr) as _);
     }
 }
 
@@ -569,8 +603,9 @@ pub fn vgic_inject_hw(vcpu: &'static mut VCpu, id: IrqID) {
 
 // CTLR GROUP
 pub const GICD_REG_GROUP_CTLR: u64 = 0;
-pub const GICD_REG_INDEX_CTLR: u64 = 0;
-pub const GICD_REG_INDEX_TYPER: u64 = 4;
+pub const GICD_REG_INDEX_CTLR: u64 = 0x0;
+pub const GICD_REG_INDEX_TYPER: u64 = 0x4;
+pub const GICD_REG_INDEX_IIDR: u64 = 0x8;
 
 pub const GICD_REG_ISENABLER_OFF: u64 = 0x100;
 pub const GICD_REG_ICENABLER_OFF: u64 = 0x180;
@@ -579,6 +614,7 @@ pub const GICD_REG_ICACTIVER_OFF: u64 = 0x380;
 pub const GICD_REG_IPRIORITYR_OFF: u64 = 0x400;
 pub const GICD_REG_ITARGETSR_OFF: u64 = 0x800;
 pub const GICD_REG_IROUTER_OFF: u64 = 0x6000;
+pub const GICD_REG_ID_OFF: u64 = 0xffd0;
 
 // OTHER GROUPS
 pub const GICD_REG_GROUP_IGROUPR: u64 = 0x80 >> 7;
@@ -588,4 +624,6 @@ pub const GICD_REG_GROUP_ICPENDR: u64 = 0x280 >> 7;
 pub const GICD_REG_GROUP_ICACTIVER: u64 = 0x380 >> 7;
 pub const GICD_REG_GROUP_IPRIORITYR: u64 = 0x400 >> 7;
 pub const GICD_REG_GROUP_ITARGETSR: u64 = 0x800 >> 7;
+pub const GICD_REG_GROUP_ICFGR: u64 = 0xc00 >> 7;
+
 pub const GICD_REG_GROUP_IROUTER: u64 = 0x6000 >> 7;

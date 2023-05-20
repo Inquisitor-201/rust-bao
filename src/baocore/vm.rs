@@ -85,11 +85,16 @@ impl VCpu {
     }
 
     pub fn write_reg(&mut self, reg: u64, val: u64) {
-        assert!(reg <= 30);
+        if reg > 30 {
+            return;
+        }
         self.regs.x[reg as usize] = val;
     }
 
     pub fn read_reg(&mut self, reg: u64) -> u64 {
+        if reg > 30 {
+            return 0;
+        }
         self.regs.x[reg as usize]
     }
 
@@ -127,7 +132,7 @@ pub fn myvm() -> &'static mut VM {
 }
 
 pub trait VMArchTrait {
-    fn arch_init(&mut self, config: &VMConfig);
+    fn arch_init(&mut self, config: &VMConfig, master: bool);
 }
 
 impl VM {
@@ -333,6 +338,7 @@ impl VM {
 
     pub fn emul_get_mem(&self, addr: Vaddr) -> Option<EmulHandler> {
         for emu in self.emul_mem_list.iter() {
+            println!("addr{:#x}, emu.va_base{:#x?} emu.size{:#x?}", addr, emu.va_base, emu.size);
             if addr >= emu.va_base && addr < emu.va_base + emu.size as u64 {
                 return Some(emu.handler);
             }
@@ -372,13 +378,13 @@ pub fn vm_init(vm_alloc: &VMAllocation, config: &VMConfig, master: bool, vm_id: 
     vm.vcpu_init(config);
     vm.sync_token.sync_barrier();
 
-    vm.arch_init(config);
+    vm.arch_init(config, master);
+    vm.sync_token.sync_barrier();
 
     if master {
         vm.init_mem_regions(config);
         vm.init_dev(config);
         vm.init_ipc(config);
-        println!("master finally done");
     }
 
     vm.sync_token.sync_and_clear_msg();

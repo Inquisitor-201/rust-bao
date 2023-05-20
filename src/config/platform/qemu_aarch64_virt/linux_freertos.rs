@@ -82,51 +82,51 @@ pub static CONFIG: Lazy<RwLock<Config>> = Lazy::new(|| {
         },
     };
 
-    // let _vm_config_linux = VMConfig {
-    //     base_addr: 0x60000000,
-    //     load_addr: _linux_vm_beg as u64,
-    //     size: (_linux_vm_end as usize - _linux_vm_beg as usize),
-    //     separately_loaded: false,
-    //     inplace: false,
-    //     entry: 0x60000000,
-    //     vm_platform: VMPlatform {
-    //         cpu_num: 3,
-    //         vm_regions: vec![VMMemRegion {
-    //             base: 0x60000000,
-    //             size: 0x40000000,
-    //             place_phys: true,
-    //             phys: 0x60000000,
-    //         }],
-    //         devs: vec![
-    //             // VMDeviceRegion {
-    //             //     /* Arch timer interrupt */
-    //             //     pa: 0,
-    //             //     va: 0,
-    //             //     size: 0,
-    //             //     interrupts: vec![27],
-    //             // },
-    //             // VMDeviceRegion {
-    //             //     /* virtio devices */
-    //             //     pa: 0xa003000,
-    //             //     va: 0xa003000,
-    //             //     size: 0x1000,
-    //             //     interrupts: vec![72, 73, 74, 75, 76, 77, 78, 79],
-    //             // },
-    //         ],
-    //         arch: ArchVMPlatform {
-    //             gic: VGicDscr {
-    //                 gicd_addr: 0xf9010000,
-    //                 gicc_addr: 0xf9020000,
-    //                 gicr_addr: 0,
-    //                 interrupt_num: 0,
-    //             },
-    //         },
-    //         ipcs: todo!(),
-    //     },
-    // };
+    let vm_config_linux = VMConfig {
+        base_addr: 0x60000000,
+        load_addr: _linux_vm_beg as u64,
+        size: (_linux_vm_end as usize - _linux_vm_beg as usize),
+        separately_loaded: false,
+        inplace: false,
+        entry: 0x60000000,
+        vm_platform: VMPlatform {
+            cpu_num: 1,
+            vm_regions: vec![VMMemRegion {
+                base: 0x60000000,
+                size: 0x40000000,
+                place_phys: true,
+                phys: 0x60000000,
+            }],
+            devs: vec![
+                VMDeviceRegion {
+                    /* Arch timer interrupt */
+                    pa: 0,
+                    va: None,
+                    size: 0,
+                    interrupts: vec![27],
+                },
+                VMDeviceRegion {
+                    /* virtio devices */
+                    pa: 0xa003000,
+                    va: Some(0xa003000),
+                    size: 0x1000,
+                    interrupts: vec![72, 73, 74, 75, 76, 77, 78, 79],
+                },
+            ],
+            arch: ArchVMPlatform {
+                gic: VGicDscr {
+                    gicd_addr: 0x8000000,
+                    gicc_addr: 0,
+                    gicr_addr: 0x80a0000,
+                    interrupt_num: 0,
+                },
+            },
+            ipcs: vec![],
+        },
+    };
 
     RwLock::new(Config {
         shared_mem: vec![SharedMemConfig { size: 0x10000 }],
-        vmlist: vec![vm_config_freertos],
+        vmlist: vec![vm_config_freertos, vm_config_linux],
     })
 });

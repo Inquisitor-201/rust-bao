@@ -36,3 +36,6 @@ upd: 2023-5-16
 4. todo: reuse VGicHandlerInfo
 5. todo: vm interrupts set
 6. todo: vgic_write_lr: pend, act
+
+7. smc_call
+8. icfg????
