@@ -12,7 +12,6 @@ todo:
 11. todo: smmu init
 12. todo: ipc init
 13. todo: vcpu->arch.psci_ctx
-14. todo: vgic_cpu_init, vgic_init
 15. todo: tlb disable?
 16. todo: copy vm-image: cache_flush_range
 17. todo: mem_unmap

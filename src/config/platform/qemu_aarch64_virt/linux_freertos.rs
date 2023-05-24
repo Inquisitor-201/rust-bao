@@ -112,6 +112,13 @@ pub static CONFIG: Lazy<RwLock<Config>> = Lazy::new(|| {
                     size: 0x1000,
                     interrupts: vec![72, 73, 74, 75, 76, 77, 78, 79],
                 },
+                VMDeviceRegion {
+                    /* Pl011 */
+                    pa: 0x9000000,
+                    va: Some(0x9000000),
+                    size: 0x10000,
+                    interrupts: vec![33],
+                },
             ],
             arch: ArchVMPlatform {
                 gic: VGicDscr {
@@ -127,6 +134,6 @@ pub static CONFIG: Lazy<RwLock<Config>> = Lazy::new(|| {
 
     RwLock::new(Config {
         shared_mem: vec![SharedMemConfig { size: 0x10000 }],
-        vmlist: vec![vm_config_freertos, vm_config_linux],
+        vmlist: vec![vm_config_linux],
     })
 });

@@ -58,6 +58,11 @@ clean:
 show-features:
 	rustc --print=target-features --target=$(rustc_target)
 
+guest:
+	make -C lloader linux_image_path=../imgs/qemu-aarch64-virt/Image\
+		linux_dts_path=../dts/qemu-aarch64-virt/linux.dts\
+		output_path=../imgs/qemu-aarch64-virt/linux.bin
+
 $(bao_bin): build
 	@$(OBJCOPY) $(bao_elf) --strip-all -O binary $@
 

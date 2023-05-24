@@ -4,7 +4,7 @@ use tock_registers::interfaces::Readable;
 use crate::{
     arch::aarch64::{
         gic::{gicc_dir, gicc_eoir, gicc_iar},
-        intr::interrupts_handle,
+        intr::interrupts_handle, psci::{is_psci_smc_call, psci_smc_handler},
     },
     baocore::{
         emul::EmulAccess,
@@ -45,23 +45,6 @@ fn aborts_data_lower(iss: u64, far: u64, il: u64) {
     }
 }
 
-const PSCI_VERSION: u64 = 0x84000000;
-const PSCI_MIG_INFO_TYPE: u64 = 0x84000006;
-const PSCI_CPU_SUSPEND_SMC64: u64 = 0xc4000001;
-const PSCI_CPU_ON_SMC64: u64 = 0xc4000003;
-
-fn psci_smc_handler(fid: u64, _arg1: u64, _arg2: u64, _arg3: u64) -> u64 {
-    match fid {
-        PSCI_VERSION => 2,       // PSCI_VERSION_0_2
-        PSCI_MIG_INFO_TYPE => 2, // PSCI_TOS_NOT_PRESENT_MP
-        PSCI_CPU_SUSPEND_SMC64 => 1,
-        PSCI_CPU_ON_SMC64 => 1,
-        _ => {
-            panic!("unknown psci call");
-        }
-    }
-}
-
 pub fn smc_handler() {
     let fid = myvcpu().read_reg(0);
     let arg1 = myvcpu().read_reg(1);
@@ -72,7 +55,7 @@ pub fn smc_handler() {
         fid, arg1, arg2, arg3
     );
 
-    if fid & 0xff000000 == 0x84000000 || fid & 0xff000000 == 0xc4000000 {
+    if is_psci_smc_call(fid) {
         // is SMC_HANDLER
         let ret = psci_smc_handler(fid, arg1, arg2, arg3);
         myvcpu().write_reg(0, ret);

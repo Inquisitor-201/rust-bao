@@ -6,6 +6,7 @@ pub mod intr;
 pub mod platform;
 pub mod vm;
 pub mod vmm;
+pub mod psci;
 
 #[macro_use]
 pub mod sysregs;
