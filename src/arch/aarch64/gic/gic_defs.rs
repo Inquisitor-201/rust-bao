@@ -31,6 +31,10 @@ pub const fn gic_config_regs(nint: usize) -> usize {
     nint * GIC_CONFIG_BITS / (core::mem::size_of::<u32>() * 8)
 }
 
+pub const fn gic_config_off(nint: usize) -> usize {
+    nint * GIC_CONFIG_BITS % (core::mem::size_of::<u32>() * 8)
+}
+
 pub const fn gic_sec_regs(nint: usize) -> usize {
     nint * GIC_SEC_BITS / (core::mem::size_of::<u32>() * 8)
 }

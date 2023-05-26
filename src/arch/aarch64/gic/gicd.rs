@@ -6,7 +6,7 @@ use super::{
     gic_defs::{
         gic_config_regs, gic_int_mask, gic_int_regs, gic_prio_off, gic_prio_regs, gic_sec_regs,
         gic_target_regs, GICD_CTLR_ARE_NS_BIT, GICD_CTLR_ENA_BIT, GICD_IROUTER_INV, GIC_CPU_PRIV,
-        GIC_MAX_INTERUPTS, GIC_NUM_PRIVINT_REGS, GIC_NUM_SGI_REGS, GIC_PRIO_BITS,
+        GIC_MAX_INTERUPTS, GIC_NUM_PRIVINT_REGS, GIC_NUM_SGI_REGS, GIC_PRIO_BITS, gic_config_off, GIC_CONFIG_BITS,
     },
     GicVersion, GIC_VERSION,
 };
@@ -14,19 +14,19 @@ use super::{
 #[repr(C)]
 #[repr(align(0x10000))]
 pub struct GicdHw {
-    pub CTLR: u32,
-    pub TYPER: u32,
-    pub IIDR: u32,
+    pub CTLR: u32,                         // 0x0
+    pub TYPER: u32,                        // 0x4
+    pub IIDR: u32,                         // 0x8
     pub pad0: [u8; 0x0010 - 0x000C],
-    pub STATUSR: u32,
+    pub STATUSR: u32,                      // 0x10
     pub pad1: [u8; 0x0040 - 0x0014],
-    pub SETSPI_NSR: u32,
+    pub SETSPI_NSR: u32,                   // 0x40
     pub pad2: [u8; 0x0048 - 0x0044],
-    pub CLRSPI_NSR: u32,
+    pub CLRSPI_NSR: u32,                   // 0x48
     pub pad3: [u8; 0x0050 - 0x004C],
-    pub SETSPI_SR: u32,
+    pub SETSPI_SR: u32,                    // 0x50
     pub pad4: [u8; 0x0058 - 0x0054],
-    pub CLRSPI_SR: u32,
+    pub CLRSPI_SR: u32,                    // 0x58
     pub pad9: [u8; 0x0080 - 0x005C],
     pub IGROUPR: [u32; gic_int_regs(GIC_MAX_INTERUPTS)], // 0x80
     pub ISENABLER: [u32; gic_int_regs(GIC_MAX_INTERUPTS)], // 0x100
@@ -134,5 +134,12 @@ impl GicdHw {
 
     pub fn set_route(&mut self, id: IrqID, route: u64) {
         self.IROUTER[id as usize] = route;
+    }
+
+    pub fn set_cfg(&mut self, id: IrqID, cfg: u8) {
+        let reg_ind = gic_config_regs(id as _);
+        let off = gic_config_off(id as _);
+        let mask = bit32_mask(off as _, GIC_CONFIG_BITS as _);
+        self.ICFGR[reg_ind] = (self.ICFGR[reg_ind] & !mask) | (((cfg as u32) << off) & mask);
     }
 }

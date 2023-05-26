@@ -120,6 +120,18 @@ impl GicrHw {
         self.IPRIORITYR[reg_ind] =
             (self.IPRIORITYR[reg_ind] & !mask) | (((prio as u32) << off) & mask);
     }
+
+    pub fn set_cfg(&mut self, id: IrqID, cfg: u8) {
+        let reg_id = gic_config_regs(id as _);
+        let off = gic_config_off(id as _);
+        let mask = bit32_mask(off as _, GIC_CONFIG_BITS as _);
+
+        match reg_id {
+            0 => self.ICFGR0 = (self.ICFGR0 & !mask) | (((cfg as u32) << off) & mask),
+            1 => self.ICFGR1 = (self.ICFGR1 & !mask) | (((cfg as u32) << off) & mask),
+            _ => panic!("set_cfg: invalid intr id")
+        }
+    }
 }
 
 #[repr(C)]
@@ -230,6 +242,12 @@ pub fn gicd_set_route(id: IrqID, route: u64) {
     gic.gicd().set_route(id, route);
 }
 
+pub fn gicd_set_cfg(id: IrqID, cfg: u8) {
+    let gic = unsafe { GIC.get_mut().unwrap() };
+    let _lock = gic.gicd_lock.lock();
+    gic.gicd().set_cfg(id, cfg as _);
+}
+
 pub fn gicd_get_pidr(addr: u64) -> u32 {
     let gic = unsafe { GIC.get_mut().unwrap() };
     let _lock = gic.gicd_lock.lock();
@@ -265,6 +283,12 @@ pub fn gicr_set_prio(id: IrqID, prio: u8, gicr_id: CpuID) {
     let gic = unsafe { GIC.get_mut().unwrap() };
     let _lock = gic.gicr_lock.lock();
     gic.gicr(gicr_id as _).set_prio(id, prio);
+}
+
+pub fn gicr_set_cfg(id: IrqID, cfg: u8, gicr_id: CpuID) {
+    let gic = unsafe { GIC.get_mut().unwrap() };
+    let _lock = gic.gicr_lock.lock();
+    gic.gicr(gicr_id as _).set_cfg(id, cfg);
 }
 
 pub fn gicr_get_pidr(addr: u64) -> u32 {

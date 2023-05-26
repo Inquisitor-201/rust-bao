@@ -80,11 +80,11 @@ pub const fn bit64_extract(x: u64, off: u64, len: u64) -> u64 {
 }
 
 pub const fn bit32_mask(off: u64, len: u64) -> u32 {
-    ((1 << len) - 1) << off
+    if len < 32 { ((1 << len) - 1) << off } else { u32::MAX }
 }
 
 pub const fn bit64_mask(off: u64, len: u64) -> u64 {
-    ((1 << len) - 1) << off
+    if len < 64 { ((1 << len) - 1) << off } else { u64::MAX }
 }
 
 pub const PAGE_OFFSET_MASK: usize = PAGE_SIZE - 1;

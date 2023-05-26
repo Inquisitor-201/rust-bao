@@ -4,7 +4,7 @@ use crate::{
     arch::aarch64::sysregs::*,
     baocore::{
         types::{Paddr, VCpuID, Vaddr},
-        vm::{VCpu, VCpuArchTrait, VMArchTrait, VM}, cpu::mycpu,
+        vm::{VCpu, VCpuArchTrait, VMArchTrait, VM},
     },
     config::VMConfig,
     write_reg,

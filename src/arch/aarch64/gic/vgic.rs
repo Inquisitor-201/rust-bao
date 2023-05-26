@@ -6,18 +6,17 @@ use crate::{
         gic_is_priv, gicd_reg_mask, gich_get_hcr, gich_set_hcr, gicr_set_act, gicr_set_enable,
         gicr_set_pend, gicr_set_prio,
         gicv3::{gicd_set_act, gicd_set_pend, gicd_set_prio, gicd_set_route},
-        VGIC_ENABLE_MASK,
+        VGIC_ENABLE_MASK, gicd_set_cfg, gicr_set_cfg,
     },
     baocore::{
-        cpu::mycpu,
         emul::EmulAccess,
-        types::{IrqID, VCpuID, Vaddr},
+        types::{IrqID, VCpuID, Vaddr, CpuID},
         vm::{myvcpu, myvm, VCpu, VM},
     },
     debug,
     platform::{ArchPlatformTrait, PLATFORM},
     read_reg,
-    util::bit64_extract,
+    util::bit64_extract, info, println,
 };
 
 use super::{
@@ -25,10 +24,10 @@ use super::{
         GICD_CTLR_ARE_NS_BIT, GICD_IROUTER_INV, GICH_LR_GRP_BIT, GICH_LR_HW_BIT, GIC_CPU_PRIV,
         GIC_MAX_SGIS,
     },
-    gic_is_sgi, gich_write_lr,
+    gic_is_sgi, gicd_get_pidr, gich_write_lr,
     gicv3::gicd_set_enable,
     vgicv3::VGicR,
-    GicVersion, GIC_VERSION, gicd_get_pidr,
+    GicVersion, GIC_VERSION,
 };
 
 pub struct VGicIntr {
@@ -36,9 +35,9 @@ pub struct VGicIntr {
 }
 
 impl VGicIntr {
-    pub fn new(id: IrqID) -> Self {
+    pub fn new(id: IrqID, redist: CpuID) -> Self {
         Self {
-            inner: RwLock::new(VGicIntrInner::new(id)),
+            inner: RwLock::new(VGicIntrInner::new(id, redist)),
         }
     }
 
@@ -66,11 +65,13 @@ pub struct VGicIntrInner {
     pub prio: u8,
     pub route: u64,
     pub phys_route: u64,
+    pub redist: u64,
     pub in_lr: bool,
+    pub cfg: u8,
 }
 
 impl VGicIntrInner {
-    pub fn new(id: IrqID) -> Self {
+    pub fn new(id: IrqID, redist: CpuID) -> Self {
         Self {
             owner: None,
             enabled: false,
@@ -81,6 +82,8 @@ impl VGicIntrInner {
             prio: u8::MAX, // lowest PRIO
             route: GICD_IROUTER_INV,
             phys_route: GICD_IROUTER_INV,
+            redist,
+            cfg: 0,
             id,
         }
     }
@@ -129,7 +132,7 @@ pub struct VGicPriv {
 }
 
 impl VGicPriv {
-    pub fn new() -> Self {
+    pub fn new(redist: CpuID) -> Self {
         Self {
             vgicr: VGicR {
                 lock: Mutex::new(()),
@@ -141,7 +144,7 @@ impl VGicPriv {
             interrupts: {
                 let mut intrs = Vec::with_capacity(GIC_CPU_PRIV);
                 for i in 0..GIC_CPU_PRIV {
-                    intrs.push(VGicIntr::new(i as _));
+                    intrs.push(VGicIntr::new(i as _, redist));
                 }
                 intrs
             },
@@ -201,12 +204,12 @@ pub fn vgicd_emul_handler(acc: &EmulAccess) -> bool {
             update_hw: Some(vgic_int_state_hw),
         },
         GICD_REG_GROUP_ICFGR => VGicHandlerInfo {
-            reg_access: vgic_emul_razwi,
-            field_width: 0,
-            regroup_base: 0,
-            read_field: None,
-            update_field: None,
-            update_hw: None,
+            reg_access: vgic_emul_generic_access,
+            field_width: 2,
+            regroup_base: GICD_REG_ICFGR_OFF,
+            read_field: Some(vgic_int_get_cfg),
+            update_field: Some(vgic_int_set_cfg),
+            update_hw: Some(vgic_int_set_cfg_hw),
         },
         _ => {
             let gicd_reg = gicd_reg_mask(acc.addr);
@@ -337,8 +340,11 @@ pub fn vgicd_emul_misc_access(
             }
         }
         _ => {
-            debug!("unknown gicd access {:#x?} (vgicd_emul_misc_access)", acc.addr);
-        },
+            debug!(
+                "unknown gicd access {:#x?} (vgicd_emul_misc_access)",
+                acc.addr
+            );
+        }
     }
 }
 
@@ -348,6 +354,7 @@ pub fn vgic_emul_generic_access(
     gicr_access: bool,
     vgicr_id: VCpuID,
 ) {
+    println!("field_with = {}", handlers.field_width);
     let field_width = handlers.field_width;
     let first_int = (gicd_reg_mask(acc.addr) - handlers.regroup_base) * 8 / field_width;
     let mut val = if acc.write {
@@ -384,6 +391,7 @@ pub fn vgic_emul_generic_access(
     }
 
     if !acc.write {
+        println!("val = {:#x?}", val);
         myvcpu().write_reg(acc.reg, val);
     }
 }
@@ -456,12 +464,12 @@ pub fn vgic_int_clear_enable(_vcpu: *mut VCpu, intr: &mut VGicIntrInner, data: u
 
 pub fn vgic_int_enable_hw(_vcpu: *mut VCpu, intr: &mut VGicIntrInner) {
     if gic_is_priv(intr.id) {
-        gicr_set_enable(intr.id, intr.enabled, mycpu().id);
+        gicr_set_enable(intr.id, intr.enabled, intr.redist);
     } else {
         gicd_set_enable(intr.id, intr.enabled);
     }
-    debug!(
-        "intr {} (hardware) {}.",
+    info!(
+        "**********************intr {} (hardware) {}.",
         intr.id,
         if intr.enabled { "enabled" } else { "disabled" }
     );
@@ -497,16 +505,36 @@ pub fn vgic_int_clear_act(_vcpu: *mut VCpu, intr: &mut VGicIntrInner, data: u64)
 
 pub fn vgic_int_state_hw(_vcpu: *mut VCpu, intr: &mut VGicIntrInner) {
     if gic_is_priv(intr.id) {
-        gicr_set_act(intr.id, intr.active, mycpu().id);
-        gicr_set_pend(intr.id, intr.pend, mycpu().id);
+        gicr_set_act(intr.id, intr.active, intr.redist);
+        gicr_set_pend(intr.id, intr.pend, intr.redist);
     } else {
         gicd_set_act(intr.id, intr.active);
         gicd_set_pend(intr.id, intr.pend);
     }
-    debug!(
+    info!(
         "intr {} (hardware) set state: active = {}, pend = {}.",
         intr.id, intr.active, intr.pend
     );
+}
+
+pub fn vgic_int_get_cfg(_vcpu: *mut VCpu, intr: &mut VGicIntrInner) -> u64 {
+    debug!("get intr {} cfg: {:#x?}.", intr.id, intr.cfg);
+    intr.cfg as _
+}
+
+pub fn vgic_int_set_cfg(_vcpu: *mut VCpu, intr: &mut VGicIntrInner, data: u64) -> bool {
+    intr.cfg = data as _;
+    debug!("intr {} set cfg -> {:#x?}.", intr.id, intr.cfg);
+    true
+}
+
+pub fn vgic_int_set_cfg_hw(_vcpu: *mut VCpu, intr: &mut VGicIntrInner) {
+    if gic_is_priv(intr.id) {
+        gicr_set_cfg(intr.id, intr.cfg, intr.redist);
+    } else {
+        gicd_set_cfg(intr.id, intr.cfg);
+    }
+    info!("intr {} (hardware) set cfg", intr.id);
 }
 
 pub fn vgic_int_get_prio(_vcpu: *mut VCpu, intr: &mut VGicIntrInner) -> u64 {
@@ -522,11 +550,11 @@ pub fn vgic_int_set_prio(_vcpu: *mut VCpu, intr: &mut VGicIntrInner, data: u64) 
 
 pub fn vgic_int_set_prio_hw(_vcpu: *mut VCpu, intr: &mut VGicIntrInner) {
     if gic_is_priv(intr.id) {
-        gicr_set_prio(intr.id, intr.prio, mycpu().id);
+        gicr_set_prio(intr.id, intr.prio, intr.redist);
     } else {
         gicd_set_prio(intr.id, intr.prio);
     }
-    debug!("intr {} (hardware) set prio", intr.id);
+    info!("intr {} (hardware) set prio", intr.id);
 }
 
 pub fn vgic_int_get_route(_vcpu: *mut VCpu, intr: &mut VGicIntrInner) -> u64 {
@@ -551,9 +579,9 @@ pub fn vgic_int_set_route_hw(_vcpu: *mut VCpu, intr: &mut VGicIntrInner) {
     if gic_is_priv(intr.id) {
         panic!("gicr: cannot set route");
     } else {
-        gicd_set_route(intr.id, intr.phys_route);
+        gicd_set_route(intr.id, intr.redist);
     }
-    debug!("intr {} (hardware) set route", intr.id);
+    info!("intr {} (hardware) set route", intr.id);
 }
 
 // --------------------------------------------------
@@ -613,6 +641,7 @@ pub const GICD_REG_ICPENDR_OFF: u64 = 0x280;
 pub const GICD_REG_ICACTIVER_OFF: u64 = 0x380;
 pub const GICD_REG_IPRIORITYR_OFF: u64 = 0x400;
 pub const GICD_REG_ITARGETSR_OFF: u64 = 0x800;
+pub const GICD_REG_ICFGR_OFF: u64 = 0xc00;
 pub const GICD_REG_IROUTER_OFF: u64 = 0x6000;
 pub const GICD_REG_ID_OFF: u64 = 0xffd0;
 

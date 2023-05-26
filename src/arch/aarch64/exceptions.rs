@@ -4,7 +4,8 @@ use tock_registers::interfaces::Readable;
 use crate::{
     arch::aarch64::{
         gic::{gicc_dir, gicc_eoir, gicc_iar},
-        intr::interrupts_handle, psci::{is_psci_smc_call, psci_smc_handler},
+        intr::interrupts_handle,
+        psci::{is_psci_smc_call, psci_smc_handler},
     },
     baocore::{
         emul::EmulAccess,
@@ -12,7 +13,7 @@ use crate::{
         vm::{myvcpu, myvm},
     },
     debug, println,
-    util::bit64_extract,
+    util::{bit64_extract, bit64_mask}, info,
 };
 
 use super::sysregs::*;
@@ -34,7 +35,11 @@ fn aborts_data_lower(iss: u64, far: u64, il: u64) {
         write: iss & ESR_ISS_DA_WnR_BIT != 0,
         reg: bit64_extract(iss, ESR_ISS_DA_SRT_OFF, ESR_ISS_DA_SRT_LEN),
     };
-    println!("Access = {:#x?}", access);
+    // println!(
+    //     "Access = {:#x?}, reg_val = {:#x?}",
+    //     access,
+    //     myvcpu().read_reg(access.reg) & bit64_mask(0, access.width * 8)
+    // );
 
     let handler = myvm().emul_get_mem(addr).unwrap();
     if handler(&access) {
@@ -117,7 +122,7 @@ fn sync_exceptions_handler() {
 fn gic_handler() {
     let ack = gicc_iar();
     let id = ack & ((1 << 24) - 1);
-    // debug!("gic_handler: id = {}", id);
+    info!("gic_handler: id = {}", id);
 
     if id < 1020 {
         let res = interrupts_handle(id as _);

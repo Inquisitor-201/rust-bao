@@ -27,7 +27,7 @@ use super::{
     gicd::GicdHw,
     gicd_get_iidr, gicr_get_pidr,
     gicv3::GicrHw,
-    vgic::{vgicd_emul_handler, VGicIntr},
+    vgic::{vgicd_emul_handler, VGicIntr, GICD_REG_ICFGR_OFF, vgic_int_get_cfg, vgic_int_set_cfg, vgic_int_set_cfg_hw},
     GIC,
 };
 
@@ -53,7 +53,7 @@ pub fn vgic_init(vm: &mut VM, vgic_dscrp: &VGicDscr) {
     vm.arch.vgicd.iidr = gicd_get_iidr();
 
     for i in 0..vm.arch.vgicd.int_num {
-        let intr = VGicIntr::new((i + GIC_CPU_PRIV) as _);
+        let intr = VGicIntr::new((i + GIC_CPU_PRIV) as _, 0);
         // vm.arch.vgicd.interrupts[i].state = INV;
         // vm.arch.vgicd.interrupts[i].prio = GIC_LOWEST_PRIO;
         // vm.arch.vgicd.interrupts[i].cfg = 0;
@@ -92,7 +92,7 @@ pub fn vgic_init(vm: &mut VM, vgic_dscrp: &VGicDscr) {
 fn vgicr_emul_handler(acc: &EmulAccess) -> bool {
     let gicr_reg = gicr_reg_mask(acc.addr);
     let handler_info = match gicr_reg {
-        0 | GICR_REG_WAKER_OFF | GICR_REG_IGROUPR0_OFF | 0x10c00 | 0x10c04 => VGicHandlerInfo {
+        GICR_REG_CTRL_OFF | GICR_REG_WAKER_OFF | GICR_REG_IGROUPR0_OFF => VGicHandlerInfo {
             reg_access: vgic_emul_razwi,
             regroup_base: 0,
             field_width: 0,
@@ -139,6 +139,14 @@ fn vgicr_emul_handler(acc: &EmulAccess) -> bool {
             read_field: Some(vgic_int_get_act),
             update_field: Some(vgic_int_clear_act),
             update_hw: Some(vgic_int_state_hw),
+        },
+        GICR_REG_ICFGR0_OFF | GICR_REG_ICFGR1_OFF => VGicHandlerInfo {
+            reg_access: vgic_emul_generic_access,
+            regroup_base: GICD_REG_ICFGR_OFF,
+            field_width: 2,
+            read_field: Some(vgic_int_get_cfg),
+            update_field: Some(vgic_int_set_cfg),
+            update_hw: Some(vgic_int_set_cfg_hw),
         },
         _ => {
             if gicr_reg >= GICR_REG_IPRIORITYR_OFF && gicr_reg < (GICR_REG_IPRIORITYR_OFF + 0x20) {
@@ -220,6 +228,7 @@ pub const VGIC_ENABLE_MASK: u32 = 0x2;
 
 // ------------ GICR REGS ------------------
 
+const GICR_REG_CTRL_OFF: u64 = 0x0;
 const GICR_REG_TYPER_OFF: u64 = 0x8;
 const GICR_REG_WAKER_OFF: u64 = 0x14;
 const GICR_REG_IGROUPR0_OFF: u64 = 0x10080;
@@ -227,5 +236,7 @@ const GICR_REG_ISENABLER0_OFF: u64 = 0x10100;
 const GICR_REG_ICENABLER0_OFF: u64 = 0x10180;
 const GICR_REG_ICPENDR0_OFF: u64 = 0x10280;
 const GICR_REG_ICACTIVER0_OFF: u64 = 0x10380;
+const GICR_REG_ICFGR0_OFF: u64 = 0x10c00;
+const GICR_REG_ICFGR1_OFF: u64 = 0x10c04;
 const GICR_REG_IPRIORITYR_OFF: u64 = 0x10400;
 const GICR_REG_ID_OFF: u64 = 0x0ffd0;

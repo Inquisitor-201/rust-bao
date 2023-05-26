@@ -35,7 +35,7 @@ pub static CONFIG: Lazy<RwLock<Config>> = Lazy::new(|| {
         inplace: false,
         entry: 0x0,
         vm_platform: VMPlatform {
-            cpu_num: 1,
+            cpu_num: 3,
             vm_regions: vec![VMMemRegion {
                 base: 0x0,
                 size: 0x8000000,

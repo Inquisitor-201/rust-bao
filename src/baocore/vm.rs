@@ -185,7 +185,7 @@ impl VM {
                     entrypoint: 0,
                     state: PsciState::Off,
                 }),
-                vgic_priv: VGicPriv::new(),
+                vgic_priv: VGicPriv::new(mycpu().id),
             },
             regs: ArchRegs {
                 x: [0; 31],
