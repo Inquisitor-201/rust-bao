@@ -63,7 +63,7 @@ guest:
 		linux_dts_path=../dts/qemu-aarch64-virt/linux.dts\
 		output_path=../imgs/qemu-aarch64-virt/linux.bin
 
-$(bao_bin): build
+$(bao_bin): guest build
 	@$(OBJCOPY) $(bao_elf) --strip-all -O binary $@
 
 .PHONY: env build run gdb monitor clean dump show-features

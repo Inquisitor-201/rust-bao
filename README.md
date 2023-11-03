@@ -1,5 +1,12 @@
 # rust-bao
 
+This project is a Rust version of [bao-demos](https://github.com/bao-project/bao-demos)
+
+## 如何运行？
+
+1. 运行make run，在qemu中启动rust-bao，一开始会进入uboot
+2. 在uboot命令行中输入go 0x50000000进入rust-bao的镜像执行
+
 todo:
 1. automatically detect qemu & atf-fip
 2. cpu_init sync & handler
