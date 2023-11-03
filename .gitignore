@@ -1,5 +1,4 @@
+!./imgs/qemu-aarch64-virt/Image
 /target
-*.dtb
-Image*
 linux.elf
 linux*.bin
